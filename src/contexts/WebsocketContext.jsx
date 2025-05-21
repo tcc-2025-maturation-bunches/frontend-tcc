@@ -126,7 +126,6 @@ export const WebsocketProvider = ({ children }) => {
     try {
       await websocketService.sendCaptureResponse(imageId, imageUrl, requestId, stationId);
       
-      // Removendo a request
       setCaptureRequests(prev => 
         prev.filter(req => req.request_id !== requestId)
       );
