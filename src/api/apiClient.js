@@ -5,11 +5,11 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
 
 apiClient.interceptors.request.use(
   (config) => {
-    // Adicionar auth tokens se precisar
     return config;
   },
   (error) => {

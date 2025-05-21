@@ -15,6 +15,9 @@ class WebsocketService {
     this.isConnected = false;
     this.connectionId = null;
     this.eventListeners = {};
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
   }
 
   connect(url) {
@@ -24,39 +27,60 @@ class WebsocketService {
         return;
       }
 
-      this.websocket = new WebSocket(url);
+      try {
+        this.websocket = new WebSocket(url);
+        
+        this.websocket.onopen = () => {
+          console.log('WebSocket connected to:', url);
+          this.isConnected = true;
+          this.reconnectAttempts = 0;
+          this._dispatchEvent('connected', {});
+          resolve();
+        };
 
-      this.websocket.onopen = () => {
-        this.isConnected = true;
-        this._dispatchEvent('connected', {});
-        resolve();
-      };
+        this.websocket.onclose = (event) => {
+          console.log('WebSocket closed:', event);
+          this.isConnected = false;
+          this.connectionId = null;
+          this._dispatchEvent('disconnected', { code: event.code, reason: event.reason });
+          
+          // Auto-reconnect logic
+          if (this.reconnectAttempts < this.maxReconnectAttempts) {
+            setTimeout(() => {
+              this.reconnectAttempts++;
+              console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+              this.connect(url);
+            }, this.reconnectDelay * this.reconnectAttempts);
+          }
+        };
 
-      this.websocket.onclose = () => {
-        this.isConnected = false;
-        this.connectionId = null;
-        this._dispatchEvent('disconnected', {});
-      };
+        this.websocket.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          this._dispatchEvent('error', { error: error.message || 'WebSocket connection error' });
+          reject(error);
+        };
 
-      this.websocket.onerror = (error) => {
-        this._dispatchEvent('error', { error });
+        this.websocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log('WebSocket message received:', data);
+            this._handleMessage(data);
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
+            this._dispatchEvent('error', { error: 'Failed to parse message' });
+          }
+        };
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
         reject(error);
-      };
-
-      this.websocket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          this._handleMessage(data);
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
+      }
     });
   }
 
   disconnect() {
     if (this.websocket && this.isConnected) {
-      this.websocket.close();
+      this.reconnectAttempts = this.maxReconnectAttempts;
+      this.websocket.close(1000, 'Disconnected by user');
     }
   }
 
@@ -67,12 +91,19 @@ class WebsocketService {
         return;
       }
 
+      const timeout = setTimeout(() => {
+        this.removeEventListener(WS_EVENTS.CONFIG_RESPONSE, responseHandler);
+        reject(new Error('Configuration timeout'));
+      }, 10000);
+
       const responseHandler = (data) => {
+        clearTimeout(timeout);
         if (data.success) {
           this.connectionId = data.connection_id;
+          console.log('WebSocket configured with connection ID:', this.connectionId);
           resolve(data);
         } else {
-          reject(new Error('Configuration failed'));
+          reject(new Error(data.error || 'Configuration failed'));
         }
         this.removeEventListener(WS_EVENTS.CONFIG_RESPONSE, responseHandler);
       };
@@ -86,6 +117,7 @@ class WebsocketService {
         interval_minutes: intervalMinutes,
       };
 
+      console.log('Sending configuration:', message);
       this.sendMessage(message);
     });
   }
@@ -97,11 +129,17 @@ class WebsocketService {
         return;
       }
 
+      const timeout = setTimeout(() => {
+        this.removeEventListener(WS_EVENTS.MONITORING_STATUS, responseHandler);
+        reject(new Error('Start monitoring timeout'));
+      }, 10000);
+
       const responseHandler = (data) => {
+        clearTimeout(timeout);
         if (data.status === 'started') {
           resolve(data);
         } else {
-          reject(new Error('Failed to start monitoring'));
+          reject(new Error(data.error || 'Failed to start monitoring'));
         }
         this.removeEventListener(WS_EVENTS.MONITORING_STATUS, responseHandler);
       };
@@ -112,6 +150,7 @@ class WebsocketService {
         type: WS_EVENTS.START_MONITORING,
       };
 
+      console.log('Starting monitoring...');
       this.sendMessage(message);
     });
   }
@@ -123,11 +162,17 @@ class WebsocketService {
         return;
       }
 
+      const timeout = setTimeout(() => {
+        this.removeEventListener(WS_EVENTS.MONITORING_STATUS, responseHandler);
+        reject(new Error('Stop monitoring timeout'));
+      }, 10000);
+
       const responseHandler = (data) => {
+        clearTimeout(timeout);
         if (data.status === 'stopped') {
           resolve(data);
         } else {
-          reject(new Error('Failed to stop monitoring'));
+          reject(new Error(data.error || 'Failed to stop monitoring'));
         }
         this.removeEventListener(WS_EVENTS.MONITORING_STATUS, responseHandler);
       };
@@ -138,6 +183,7 @@ class WebsocketService {
         type: WS_EVENTS.STOP_MONITORING,
       };
 
+      console.log('Stopping monitoring...');
       this.sendMessage(message);
     });
   }
@@ -155,12 +201,13 @@ class WebsocketService {
       station_id: stationId,
     };
 
+    console.log('Sending capture response:', message);
     return this.sendMessage(message);
   }
 
   sendMessage(message) {
     return new Promise((resolve, reject) => {
-      if (!this.isConnected) {
+      if (!this.isConnected || !this.websocket) {
         reject(new Error('WebSocket not connected'));
         return;
       }
@@ -169,6 +216,7 @@ class WebsocketService {
         this.websocket.send(JSON.stringify(message));
         resolve();
       } catch (error) {
+        console.error('Failed to send WebSocket message:', error);
         reject(error);
       }
     });
@@ -204,6 +252,14 @@ class WebsocketService {
         }
       });
     }
+  }
+
+  getConnectionStatus() {
+    return {
+      isConnected: this.isConnected,
+      connectionId: this.connectionId,
+      readyState: this.websocket ? this.websocket.readyState : WebSocket.CLOSED
+    };
   }
 }
 

@@ -19,7 +19,6 @@ const useWebcamCapture = () => {
       const tracks = stream.getVideoTracks();
       if (tracks.length > 0) {
         setIsPermissionGranted(true);
-        tracks.forEach(track => track.stop());
       } else {
         setIsPermissionGranted(false);
         setUploadError('No camera detected');
@@ -71,8 +70,10 @@ const useWebcamCapture = () => {
       const filename = `webcam-${timestamp}.jpg`;
       
       const presignedData = await getPresignedUrl(filename, 'image/jpeg', userId);
+      setUploadProgress(30);
       
       const uploadResponse = await uploadImageToS3(presignedData.upload_url, blob, 'image/jpeg');
+      setUploadProgress(90);
       
       if (!uploadResponse.ok) {
         throw new Error('Failed to upload image to S3');
