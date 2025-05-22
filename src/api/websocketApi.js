@@ -44,7 +44,6 @@ class WebsocketService {
           this.connectionId = null;
           this._dispatchEvent('disconnected', { code: event.code, reason: event.reason });
           
-          // Auto-reconnect logic
           if (this.reconnectAttempts < this.maxReconnectAttempts) {
             setTimeout(() => {
               this.reconnectAttempts++;
