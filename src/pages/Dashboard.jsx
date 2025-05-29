@@ -4,9 +4,9 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import RecentInference from '../components/Dashboard/RecentInference';
 import InferenceHistoryTable from '../components/Dashboard/InferenceHistoryTable';
 import InferenceStats from '../components/Dashboard/InferenceStats';
+import WebSocketManagementScreen from './WebSocketManagementScreen';
 import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
-import WebSocketConfigModal from '../components/Dashboard/WebSocketConfigModal';
 import { getInferenceHistory } from '../api/inferenceApi';
 import { generateFakeInferenceHistory } from '../api/generateFakeData';
 import { useWebsocket } from '../contexts/WebsocketContext';
@@ -18,8 +18,10 @@ const Dashboard = () => {
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
-  const [showWebSocketModal, setShowWebSocketModal] = useState(false);
   const [useFakeData, setUseFakeData] = useState(true);
+  const [showWebSocketScreen, setShowWebSocketScreen] = useState(false);
+  const [selectedInference, setSelectedInference] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     loadInferenceHistory();
@@ -87,6 +89,14 @@ const Dashboard = () => {
     loadInferenceHistory();
   };
 
+  if (showWebSocketScreen) {
+    return (
+      <div>
+        <WebSocketManagementScreen onBack={() => setShowWebSocketScreen(false)} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-150">
       <header className="bg-white dark:bg-gray-800 shadow-md">
@@ -120,14 +130,14 @@ const Dashboard = () => {
             Realizar Análise
           </button>
           
-          <button
-            onClick={() => setShowWebSocketModal(true)}
-            className={`px-4 py-2 ${isConnected ? 'bg-blue-600' : 'bg-gray-600'} text-white rounded-md hover:bg-opacity-90 transition-colors duration-150 flex items-center`}
+          <button 
+            onClick={() => setShowWebSocketScreen(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-150 flex items-center"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5.05 3.636a1 1 0 010 1.414 7 7 0 000 9.9 1 1 0 11-1.414 1.414 9 9 0 010-12.728 1 1 0 011.414 0zm9.9 0a1 1 0 011.414 0 9 9 0 010 12.728 1 1 0 11-1.414-1.414 7 7 0 000-9.9 1 1 0 010-1.414zM7.879 6.464a1 1 0 010 1.414 3 3 0 000 4.243 1 1 0 11-1.414 1.414 5 5 0 010-7.07 1 1 0 011.414 0zm4.242 0a1 1 0 011.414 0 5 5 0 010 7.072 1 1 0 01-1.414-1.414 3 3 0 000-4.244 1 1 0 010-1.414z" clipRule="evenodd" />
+              <path fillRule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
             </svg>
-            {isConnected ? 'WebSocket Conectado' : 'Configurar WebSocket'}
+            Gerenciar WebSockets
           </button>
           
           <button
@@ -178,15 +188,6 @@ const Dashboard = () => {
         <WebcamCaptureModal 
           onClose={() => setShowWebcamModal(false)} 
           onInferenceCreated={handleInferenceCreated}
-          userId={user.id}
-        />
-      )}
-
-      {showWebSocketModal && (
-        <WebSocketConfigModal 
-          onClose={() => setShowWebSocketModal(false)} 
-          onConnect={handleWebSocketConnect}
-          isConnected={isConnected}
           userId={user.id}
         />
       )}

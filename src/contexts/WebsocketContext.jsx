@@ -1,157 +1,261 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { websocketService, WS_EVENTS } from '../api/websocketApi';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { WS_EVENTS, WebsocketService } from '../api/websocketApi';
+import { v4 as uuidv4 } from 'uuid';
 
 const WebsocketContext = createContext();
 
+const LOCAL_STORAGE_KEY = 'websocketConfigs';
+
+const createWebSocketInstance = () => new WebsocketService();
+
 export const WebsocketProvider = ({ children }) => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const [connectionId, setConnectionId] = useState(null);
-  const [lastError, setLastError] = useState(null);
-  const [captureRequests, setCaptureRequests] = useState([]);
-  const [config, setConfig] = useState({
-    stationId: '',
-    userId: '',
-    intervalMinutes: 5,
+  const [websocketConfigs, setWebsocketConfigs] = useState(() => {
+    const savedConfigs = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const initialConfigs = savedConfigs ? JSON.parse(savedConfigs) : {};
+    Object.keys(initialConfigs).forEach(id => {
+      initialConfigs[id] = {
+        ...initialConfigs[id],
+        isConnected: false,
+        isMonitoring: false,
+        connectionId: null,
+        lastError: null,
+        serviceInstance: createWebSocketInstance(),
+      };
+    });
+    return initialConfigs;
   });
 
-  useEffect(() => {
-    websocketService.addEventListener('connected', handleConnected);
-    websocketService.addEventListener('disconnected', handleDisconnected);
-    websocketService.addEventListener('error', handleError);
-    websocketService.addEventListener(WS_EVENTS.CONFIG_RESPONSE, handleConfigResponse);
-    websocketService.addEventListener(WS_EVENTS.MONITORING_STATUS, handleMonitoringStatus);
-    websocketService.addEventListener(WS_EVENTS.CAPTURE_REQUEST, handleCaptureRequest);
-    
-    // Unmount
-    return () => {
-      websocketService.removeEventListener('connected', handleConnected);
-      websocketService.removeEventListener('disconnected', handleDisconnected);
-      websocketService.removeEventListener('error', handleError);
-      websocketService.removeEventListener(WS_EVENTS.CONFIG_RESPONSE, handleConfigResponse);
-      websocketService.removeEventListener(WS_EVENTS.MONITORING_STATUS, handleMonitoringStatus);
-      websocketService.removeEventListener(WS_EVENTS.CAPTURE_REQUEST, handleCaptureRequest);
-      
-      if (isConnected) {
-        websocketService.disconnect();
-      }
-    };
+  const updateAndSaveConfigs = (newConfigs) => {
+    setWebsocketConfigs(newConfigs);
+    const serializableConfigs = {};
+    for (const id in newConfigs) {
+      const { serviceInstance, isConnected, isMonitoring, connectionId, lastError, captureRequests, ...configToSave } = newConfigs[id];
+      serializableConfigs[id] = configToSave;
+    }
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializableConfigs));
+  };
+
+
+  const updateConfigState = useCallback((configId, updates) => {
+    setWebsocketConfigs(prev => {
+      if (!prev[configId]) return prev;
+      return {
+        ...prev,
+        [configId]: {
+          ...prev[configId],
+          ...updates,
+        },
+      };
+    });
   }, []);
 
-  const handleConnected = () => {
-    setIsConnected(true);
-    setLastError(null);
-  };
+  useEffect(() => {
+    const listeners = [];
 
-  const handleDisconnected = () => {
-    setIsConnected(false);
-    setIsMonitoring(false);
-    setConnectionId(null);
-  };
+    Object.values(websocketConfigs).forEach(config => {
+      const { id, serviceInstance } = config;
 
-  const handleError = (data) => {
-    setLastError(data.error);
-  };
+      const handleConnected = () => updateConfigState(id, { isConnected: true, lastError: null });
+      const handleDisconnected = () => updateConfigState(id, { isConnected: false, isMonitoring: false, connectionId: null });
+      const handleError = (data) => updateConfigState(id, { lastError: data.error, isConnected: serviceInstance.getConnectionStatus().isConnected });
+      const handleConfigResponse = (data) => {
+        if (data.success) {
+          updateConfigState(id, { connectionId: data.connection_id });
+        } else {
+          updateConfigState(id, { lastError: data.error || 'Config response error' });
+        }
+      };
+      const handleMonitoringStatus = (data) => updateConfigState(id, { isMonitoring: data.status === 'started' });
+      const handleCaptureRequest = (data) => {
+         updateConfigState(id, { captureRequests: [...(websocketConfigs[id]?.captureRequests || []), data] })
+      };
 
-  const handleConfigResponse = (data) => {
-    if (data.success) {
-      setConnectionId(data.connection_id);
-    }
-  };
 
-  const handleMonitoringStatus = (data) => {
-    setIsMonitoring(data.status === 'started');
-  };
-
-  const handleCaptureRequest = (data) => {
-    setCaptureRequests(prev => [...prev, data]);
-  };
-
-  const connect = async (url) => {
-    try {
-      await websocketService.connect(url);
-      return true;
-    } catch (error) {
-      setLastError(error);
-      return false;
-    }
-  };
-
-  const disconnect = () => {
-    websocketService.disconnect();
-  };
-
-  const configureMonitoring = async (stationId, userId, intervalMinutes) => {
-    try {
-      const result = await websocketService.configureMonitoring(
-        stationId,
-        userId,
-        intervalMinutes
-      );
-      
-      setConfig({
-        stationId,
-        userId,
-        intervalMinutes,
+      serviceInstance.addEventListener('connected', handleConnected);
+      serviceInstance.addEventListener('disconnected', handleDisconnected);
+      serviceInstance.addEventListener('error', handleError);
+      serviceInstance.addEventListener(WS_EVENTS.CONFIG_RESPONSE, handleConfigResponse);
+      serviceInstance.addEventListener(WS_EVENTS.MONITORING_STATUS, handleMonitoringStatus);
+      serviceInstance.addEventListener(WS_EVENTS.CAPTURE_REQUEST, handleCaptureRequest);
+      listeners.push({
+        id,
+        serviceInstance,
+        handlers: [
+            { event: 'connected', handler: handleConnected },
+            { event: 'disconnected', handler: handleDisconnected },
+            { event: 'error', handler: handleError },
+            { event: WS_EVENTS.CONFIG_RESPONSE, handler: handleConfigResponse },
+            { event: WS_EVENTS.MONITORING_STATUS, handler: handleMonitoringStatus },
+            { event: WS_EVENTS.CAPTURE_REQUEST, handler: handleCaptureRequest },
+        ]
       });
-      
-      return result;
+    });
+
+    return () => {
+      listeners.forEach(({ serviceInstance, handlers }) => {
+        handlers.forEach(({event, handler}) => serviceInstance.removeEventListener(event, handler));
+        if (serviceInstance.getConnectionStatus().isConnected) {
+            serviceInstance.disconnect();
+        }
+      });
+    };
+  }, [websocketConfigs, updateConfigState]);
+
+
+  const addWebSocketConfig = async (configData) => {
+    const configId = uuidv4();
+    const serviceInstance = createWebSocketInstance();
+    const newConfig = {
+      ...configData,
+      id: configId,
+      isConnected: false,
+      isMonitoring: false,
+      connectionId: null,
+      lastError: null,
+      serviceInstance,
+      captureRequests: [],
+    };
+
+    updateAndSaveConfigs({ ...websocketConfigs, [configId]: newConfig });
+    
+    try {
+      await serviceInstance.connect(newConfig.url);
+      await new Promise(resolve => setTimeout(resolve, 100)); 
+
+      if (serviceInstance.getConnectionStatus().isConnected) {
+        const configResult = await serviceInstance.configureMonitoring(
+          newConfig.stationId,
+          newConfig.userId,
+          newConfig.intervalMinutes
+        );
+        return configResult.success;
+      } else {
+        updateConfigState(configId, { lastError: 'Falha ao conectar o WebSocket recém-adicionado.' });
+        return false;
+      }
     } catch (error) {
-      setLastError(error);
+      updateConfigState(configId, { lastError: error.message || 'Erro ao adicionar e configurar WebSocket.' });
+      return false;
+    }
+  };
+  
+  const removeWebSocketConfig = (configId) => {
+    const config = websocketConfigs[configId];
+    if (config && config.serviceInstance.getConnectionStatus().isConnected) {
+      config.serviceInstance.disconnect();
+    }
+    const { [configId]: _, ...remainingConfigs } = websocketConfigs;
+    updateAndSaveConfigs(remainingConfigs);
+  };
+
+  const connectWebSocket = async (configId) => {
+    const config = websocketConfigs[configId];
+    if (!config || config.isConnected) return config?.isConnected || false;
+    try {
+      updateConfigState(configId, { lastError: null });
+      await config.serviceInstance.connect(config.url);
+       await new Promise(resolve => setTimeout(resolve, 100));
+       if (websocketConfigs[configId]?.serviceInstance.getConnectionStatus().isConnected) {
+         await configureWebSocket(configId, config.stationId, config.intervalMinutes, config.userId);
+         return true;
+       }
+       return false;
+    } catch (error) {
+      updateConfigState(configId, { lastError: error.message, isConnected: false });
       return false;
     }
   };
 
-  const startMonitoring = async () => {
+  const disconnectWebSocket = (configId) => {
+    const config = websocketConfigs[configId];
+    if (config && config.serviceInstance.getConnectionStatus().isConnected) {
+      config.serviceInstance.disconnect();
+    }
+  };
+
+  const configureWebSocket = async (configId, stationId, intervalMinutes, userId) => {
+    const config = websocketConfigs[configId];
+    const currentUserId = userId || config?.userId;
+
+    if (!config || !config.serviceInstance.getConnectionStatus().isConnected || !currentUserId) {
+        updateConfigState(configId, { lastError: 'Não conectado ou usuário não definido para configurar.' });
+        return false;
+    }
     try {
-      const result = await websocketService.startMonitoring();
-      return result;
+      updateConfigState(configId, { lastError: null });
+      const updatedConfigData = { ...config, stationId, intervalMinutes, userId: currentUserId };
+      const tempConfigs = { ...websocketConfigs, [configId]: updatedConfigData };
+      const serializableConfigs = {};
+        for (const id_loop in tempConfigs) {
+          const { serviceInstance, isConnected: _isConnected, isMonitoring: _isMonitoring, connectionId: _connectionId, lastError: _lastError, captureRequests: _captureRequests, ...configToSave } = tempConfigs[id_loop];
+          serializableConfigs[id_loop] = configToSave;
+        }
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(serializableConfigs));
+      setWebsocketConfigs(prev => ({...prev, [configId]: updatedConfigData}));
+
+
+      const result = await config.serviceInstance.configureMonitoring(stationId, currentUserId, intervalMinutes);
+      return result.success;
     } catch (error) {
-      setLastError(error);
+      updateConfigState(configId, { lastError: error.message });
       return false;
     }
   };
 
-  const stopMonitoring = async () => {
+  const startWebSocketMonitoring = async (configId) => {
+    const config = websocketConfigs[configId];
+    if (!config || !config.serviceInstance.getConnectionStatus().isConnected || config.isMonitoring) return false;
     try {
-      const result = await websocketService.stopMonitoring();
-      return result;
+      updateConfigState(configId, { lastError: null });
+      const result = await config.serviceInstance.startMonitoring();
+      return result.status === 'started';
     } catch (error) {
-      setLastError(error);
+      updateConfigState(configId, { lastError: error.message });
       return false;
     }
   };
 
-  const sendCaptureResponse = async (imageId, imageUrl, requestId, stationId) => {
+  const stopWebSocketMonitoring = async (configId) => {
+    const config = websocketConfigs[configId];
+    if (!config || !config.serviceInstance.getConnectionStatus().isConnected || !config.isMonitoring) return false;
     try {
-      await websocketService.sendCaptureResponse(imageId, imageUrl, requestId, stationId);
-      
-      setCaptureRequests(prev => 
-        prev.filter(req => req.request_id !== requestId)
-      );
-      
+      updateConfigState(configId, { lastError: null });
+      const result = await config.serviceInstance.stopMonitoring();
+      return result.status === 'stopped';
+    } catch (error) {
+      updateConfigState(configId, { lastError: error.message });
+      return false;
+    }
+  };
+  
+  const sendWebSocketCaptureResponse = async (configId, imageId, imageUrl, requestId, stationId) => {
+    const config = websocketConfigs[configId];
+    if (!config || !config.serviceInstance.getConnectionStatus().isConnected) return false;
+    try {
+      await config.serviceInstance.sendCaptureResponse(imageId, imageUrl, requestId, stationId);
+      updateConfigState(configId, { 
+        captureRequests: (config.captureRequests || []).filter(req => req.request_id !== requestId)
+      });
       return true;
     } catch (error) {
-      setLastError(error);
+      updateConfigState(configId, { lastError: error.message });
       return false;
     }
   };
+
 
   return (
     <WebsocketContext.Provider
       value={{
-        isConnected,
-        isMonitoring,
-        connectionId,
-        lastError,
-        captureRequests,
-        config,
-        connect,
-        disconnect,
-        configureMonitoring,
-        startMonitoring,
-        stopMonitoring,
-        sendCaptureResponse,
+        websocketConfigs,
+        addWebSocketConfig,
+        removeWebSocketConfig,
+        connectWebSocket,
+        disconnectWebSocket,
+        configureWebSocket,
+        startWebSocketMonitoring,
+        stopWebSocketMonitoring,
+        sendWebSocketCaptureResponse,
       }}
     >
       {children}

@@ -262,5 +262,4 @@ class WebsocketService {
   }
 }
 
-export const websocketService = new WebsocketService();
-export { WS_EVENTS };
+export { WebsocketService, WS_EVENTS };
