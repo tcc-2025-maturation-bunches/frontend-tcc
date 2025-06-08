@@ -92,7 +92,7 @@ const Dashboard = () => {
       <header className="bg-white dark:bg-gray-800 shadow-md">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Frutas</h1>
+            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Bananas Nanicas</h1>
             {useFakeData && (
               <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
                 Usando dados de demonstração

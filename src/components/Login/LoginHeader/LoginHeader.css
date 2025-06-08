@@ -1,0 +1,24 @@
+.login-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.login-header__title {
+  font-size: 1.5rem;       
+  line-height: 2rem;      
+  font-weight: 700;       
+  color: #16a34a;        
+  margin: 0;
+}
+
+.dark .login-header__title {
+  color: #22c55e;          
+}
+
+.login-header__subtitle {
+  padding-top: 15px;
+  font-size: 0.875rem;     
+  line-height: 1.25rem;    
+  color: #fbbf24;          
+  margin-top: 0.25rem;
+}
