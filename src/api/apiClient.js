@@ -1,3 +1,4 @@
+// src/api/apiClient.js
 import axios from 'axios';
 
 const apiClient = axios.create({
@@ -23,7 +24,18 @@ apiClient.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      console.error('API Error:', error.response.data);
+      const errorData = error.response.data;
+      
+      if (errorData.error_code || errorData.error_details) {
+        console.error('Erro estruturado:', {
+          code: errorData.error_code,
+          message: errorData.error_message,
+          details: errorData.error_details,
+          stage: errorData.error_details?.stage
+        });
+      } else {
+        console.error('API Error:', errorData);
+      }
     } else if (error.request) {
       console.error('API Error: No response received', error.request);
     } else {
@@ -32,5 +44,15 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export const getPublicConfig = async () => {
+  try {
+    const response = await apiClient.get('/status/config');
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao obter configurações públicas:', error);
+    return null;
+  }
+};
 
 export default apiClient;

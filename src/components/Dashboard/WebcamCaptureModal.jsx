@@ -4,12 +4,13 @@ import Loader from '../common/Loader';
 import Button from '../common/Button';
 import useWebcamCapture from '../../hooks/useWebcamCapture';
 import useInferencePoller from '../../hooks/useInferencePoller';
-import { processImage } from '../../api/inferenceApi';
+import { processImageCombined } from '../../api/inferenceApi';
 
 const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
   const [step, setStep] = useState(1); // 1: permission, 2: captura, 3: Resultado
   const [location, setLocation] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingError, setProcessingError] = useState(null);
   
   const {
     webcamRef,
@@ -59,15 +60,15 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
       setStep(3);
     } else if (status?.status === 'error') {
       setIsProcessing(false);
-      console.error(`Erro no processamento: ${status.error_message || error || 'Erro desconhecido'}`);
+      setProcessingError(status.error_message || error || 'Erro desconhecido no processamento');
     }
   }, [status, result, error, onInferenceCreated]);
-
 
   const handleCaptureClick = useCallback(async () => {
     const captured = captureImage();
     if (captured) {
       setStep(2);
+      setProcessingError(null);
     } else {
       console.error('Erro ao capturar imagem');
     }
@@ -76,6 +77,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
   const handleProcessClick = useCallback(async () => {
     try {
       setIsProcessing(true);
+      setProcessingError(null);
       
       const uploadResult = await uploadImage(userId);
       
@@ -83,28 +85,43 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
         throw new Error('Erro ao fazer upload da imagem');
       }
       
-      const processResult = await processImage(
-        uploadResult.imageUrl,
-        userId,
-        true,
-        { source: 'webcam', timestamp: new Date().toISOString() },
-        location || null
-      );
+      const metadata = {
+        user_id: userId,
+        image_id: uploadResult.imageId,
+        location: location || 'Webcam',
+        source: 'webcam',
+        timestamp: new Date().toISOString(),
+        device_info: navigator.userAgent
+      };
+      
+      const processResult = await processImageCombined(uploadResult.imageUrl, metadata);
       
       setRequestId(processResult.request_id);
       
     } catch (error) {
       console.error('Error processing image:', error);
-      alert(`Erro ao processar imagem: ${error.message || 'Erro desconhecido'}`);
+      setProcessingError(error.message || 'Erro desconhecido ao processar imagem');
       setIsProcessing(false);
     }
-  }, [userId, uploadImage, location, capturedImage]);
+  }, [userId, uploadImage, location]);
 
   const handleTryAgain = () => {
     resetImage();
     setStep(1);
     setRequestId(null);
     setIsProcessing(false);
+    setProcessingError(null);
+  };
+
+  const getProgressMessage = () => {
+    if (!status) return "Iniciando processamento...";
+    
+    const progress = status.progress || 0;
+    if (progress < 0.3) return "Preparando análise...";
+    if (progress < 0.5) return "Detectando objetos...";
+    if (progress < 0.8) return "Analisando maturação...";
+    if (progress < 1) return "Finalizando...";
+    return "Processamento concluído!";
   };
 
   return (
@@ -118,6 +135,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
             <button 
               onClick={onClose}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              disabled={isProcessing}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -163,7 +181,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
 
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Local (opcional)
+                  Local <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -172,6 +190,9 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Campo obrigatório para identificar a origem da análise
+                </p>
               </div>
 
               <div className="flex justify-end mt-4">
@@ -211,12 +232,23 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
               </div>
 
               {isUploading || isProcessing ? (
-                <div className="mt-4 flex justify-center">
-                  <Loader text={isUploading ? "Enviando imagem..." : "Processando análise..."} />
+                <div className="mt-4">
+                  <div className="flex justify-center mb-2">
+                    <Loader text={isUploading ? "Enviando imagem..." : getProgressMessage()} />
+                  </div>
+                  {status?.progress > 0 && (
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                      <div 
+                        className="bg-green-600 h-2.5 rounded-full transition-all duration-300"
+                        style={{ width: `${(status.progress * 100).toFixed(0)}%` }}
+                      ></div>
+                    </div>
+                  )}
                 </div>
-              ) : uploadError ? (
+              ) : (uploadError || processingError) ? (
                 <div className="mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
-                  <p>{uploadError}</p>
+                  <p className="font-medium">Erro:</p>
+                  <p className="text-sm">{uploadError || processingError}</p>
                 </div>
               ) : (
                 <div className="flex justify-end mt-4">
@@ -230,6 +262,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                   <Button 
                     variant="primary" 
                     onClick={handleProcessClick}
+                    disabled={!location.trim()}
                   >
                     Processar imagem
                   </Button>
@@ -250,12 +283,6 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                         alt="Resultado da análise"
                         className="w-full h-auto object-cover"
                       />
-                    ) : result.detection?.image_result_url ? (
-                      <img
-                        src={result.detection.image_result_url}
-                        alt="Resultado da detecção"
-                        className="w-full h-auto object-cover"
-                      />
                     ) : (
                       <div className="flex justify-center items-center h-48 text-gray-500 dark:text-gray-400">
                         <p>Imagem não disponível</p>
@@ -269,53 +296,64 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                   <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                     <dl className="space-y-2">
                       <div className="flex justify-between">
-                        <dt className="text-gray-500 dark:text-gray-400">Total de cachos:</dt>
-                        <dd className="font-medium text-gray-900 dark:text-white">{result.summary?.total_objects || 0}</dd>
+                        <dt className="text-gray-500 dark:text-gray-400">Total de objetos:</dt>
+                        <dd className="font-medium text-gray-900 dark:text-white">
+                          {result.detection?.summary?.total_objects || 0}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between">
+                        <dt className="text-gray-500 dark:text-gray-400">Com análise de maturação:</dt>
+                        <dd className="font-medium text-gray-900 dark:text-white">
+                          {result.detection?.summary?.objects_with_maturation || 0}
+                        </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Maturação média:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.summary?.average_maturation_score 
-                            ? `${(result.summary.average_maturation_score * 100).toFixed(1)}%` 
+                          {result.detection?.summary?.average_maturation_score 
+                            ? `${(result.detection.summary.average_maturation_score * 100).toFixed(1)}%` 
                             : 'N/A'}
                         </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Tempo de processamento:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.total_processing_time_ms 
-                            ? `${(result.total_processing_time_ms / 1000).toFixed(2)}s` 
+                          {result.processing_time_ms 
+                            ? `${(result.processing_time_ms / 1000).toFixed(2)}s` 
                             : 'N/A'}
                         </dd>
                       </div>
                     </dl>
 
-                    <div className="mt-4">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Distribuição:</h4>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
-                          <div className="w-2 h-2 bg-green-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
-                          <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                            {result.results?.filter(r => r.maturation_level?.category?.toLowerCase() === 'green')?.length || 0}
-                          </p>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
-                          <div className="w-2 h-2 bg-yellow-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
-                          <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                            {result.results?.filter(r => r.maturation_level?.category?.toLowerCase() === 'ripe')?.length || 0}
-                          </p>
-                        </div>
-                        <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
-                          <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
-                          <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                            {result.results?.filter(r => r.maturation_level?.category?.toLowerCase() === 'overripe')?.length || 0}
-                          </p>
+                    {result.processing_metadata?.maturation_distribution && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Distribuição:</h4>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
+                            <div className="w-2 h-2 bg-green-500 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
+                            <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                              {result.processing_metadata.maturation_distribution.unripe || 0}
+                            </p>
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
+                            <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
+                              {(result.processing_metadata.maturation_distribution.ripe || 0) + 
+                               (result.processing_metadata.maturation_distribution['semi-ripe'] || 0)}
+                            </p>
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
+                            <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
+                            <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                              {result.processing_metadata.maturation_distribution.overripe || 0}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -342,4 +380,5 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
     </div>
   );
 }
+
 export default WebcamCaptureModal;

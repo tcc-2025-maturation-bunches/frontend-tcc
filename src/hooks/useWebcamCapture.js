@@ -62,7 +62,6 @@ const useWebcamCapture = () => {
     setUploadError(null);
 
     try {
-      // Converte de base64 para blob
       const base64Data = capturedImage.split(',')[1];
       const blob = await fetch(`data:image/jpeg;base64,${base64Data}`).then(res => res.blob());
       
@@ -79,7 +78,6 @@ const useWebcamCapture = () => {
         throw new Error('Failed to upload image to S3');
       }
       
-      // Constroi a URL da imagem para exibir
       const imageUrl = presignedData.upload_url.split('?')[0];
       
       setUploadedImageUrl(imageUrl);
