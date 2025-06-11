@@ -4,6 +4,7 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import RecentInference from '../components/Dashboard/RecentInference';
 import InferenceHistoryTable from '../components/Dashboard/InferenceHistoryTable';
 import InferenceStats from '../components/Dashboard/InferenceStats';
+import InferenceStatsPreview from '../components/Dashboard/InferenceStatsPreview';
 import DeviceMonitoringDashboard from '../components/DeviceMonitoring/DeviceMonitoringDashboard';
 import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
@@ -91,6 +92,10 @@ const Dashboard = () => {
   };
 
   const handleInferenceCreated = (newInference) => {
+    if (newInference?.action === 'reopen_modal') {
+      setShowWebcamModal(true);
+      return;
+    }
     if (!newInference || !newInference.image_id) {
       console.warn('Inferência inválida recebida:', newInference);
       return;
@@ -260,25 +265,11 @@ const Dashboard = () => {
                 onViewDetails={handleViewDetails} 
               />
               
-              <div className="flex items-center justify-center min-h-[400px] bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
-                <div className="text-center p-6">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Estatísticas Detalhadas
-                  </h3>
-                  <p className="text-gray-500 dark:text-gray-400 mb-4">
-                    Visualize gráficos e análises completas dos dados
-                  </p>
-                  <button
-                    onClick={() => setActiveTab('statistics')}
-                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-150"
-                  >
-                    Ver Estatísticas
-                  </button>
-                </div>
-              </div>
+              <InferenceStatsPreview 
+                data={inferenceHistory} 
+                isLoading={isLoading} 
+                onViewDetails={() => setActiveTab('statistics')}
+              />
             </div>
 
             <div className="mt-6">

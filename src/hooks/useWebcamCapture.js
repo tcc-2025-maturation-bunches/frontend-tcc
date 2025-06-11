@@ -49,6 +49,7 @@ const useWebcamCapture = () => {
     setUploadedImageId(null);
     setUploadProgress(0);
     setUploadError(null);
+    setIsUploading(false);
   }, []);
 
   const uploadImage = useCallback(async (userId) => {

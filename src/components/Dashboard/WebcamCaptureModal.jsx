@@ -51,13 +51,13 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
         stopPolling();
       }
     };
-  }, [requestId, isPolling, startPolling, stopPolling]);
+  }, [requestId]);
 
   useEffect(() => {
-    if (status?.status === 'completed' && result) {
+    if (status?.status === 'completed' && result && step !== 3) {
       setIsProcessing(false);
-      onInferenceCreated(result);
       setStep(3);
+      onInferenceCreated(result);
     } else if (status?.status === 'error' || status?.status === 'failed') {
       setIsProcessing(false);
       setProcessingError(status.error_message || 'Erro no processamento');
@@ -65,7 +65,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
       setIsProcessing(false);
       setProcessingError(error);
     }
-  }, [status, result, error, onInferenceCreated]);
+  }, [status, result, error, step]);
 
 
   const handleCaptureClick = useCallback(async () => {
@@ -116,12 +116,15 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
   }, [userId, uploadImage, location]);
 
   const handleTryAgain = () => {
-    resetImage();
-    setStep(1);
-    setRequestId(null);
-    setIsProcessing(false);
-    setProcessingError(null);
-    stopPolling();
+    if (isPolling) {
+      stopPolling();
+    }
+    onClose();
+    setTimeout(() => {
+      if (onInferenceCreated) {
+        onInferenceCreated({ action: 'reopen_modal' });
+      }
+    }, 100);
   };
 
   const getProgressMessage = () => {
@@ -309,34 +312,34 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Total de objetos:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.detection?.summary?.total_objects || 0}
+                          {result.summary?.total_objects || 0}
                         </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Com análise de maturação:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.detection?.summary?.objects_with_maturation || 0}
+                          {result.summary?.objects_with_maturation || 0}
                         </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Maturação média:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.detection?.summary?.average_maturation_score 
-                            ? `${(result.detection.summary.average_maturation_score * 100).toFixed(1)}%` 
+                          {result.summary?.average_maturation_score 
+                            ? `${(result.summary.average_maturation_score * 100).toFixed(1)}%` 
                             : 'N/A'}
                         </dd>
                       </div>
                       <div className="flex justify-between">
                         <dt className="text-gray-500 dark:text-gray-400">Tempo de processamento:</dt>
                         <dd className="font-medium text-gray-900 dark:text-white">
-                          {result.processing_time_ms 
-                            ? `${(result.processing_time_ms / 1000).toFixed(2)}s` 
+                          {result.summary?.total_processing_time_ms 
+                            ? `${(result.summary.total_processing_time_ms / 1000).toFixed(2)}s` 
                             : 'N/A'}
                         </dd>
                       </div>
                     </dl>
 
-                    {result.processing_metadata?.maturation_distribution && (
+                    {result.summary?.maturation_counts && (
                       <div className="mt-4">
                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Distribuição:</h4>
                         <div className="grid grid-cols-3 gap-2">
@@ -344,22 +347,21 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                             <div className="w-2 h-2 bg-green-500 rounded-full mx-auto mb-1"></div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
                             <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                              {result.processing_metadata.maturation_distribution.unripe || 0}
+                              {result.summary.maturation_counts.green || 0}
                             </p>
                           </div>
                           <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
                             <div className="w-2 h-2 bg-yellow-500 rounded-full mx-auto mb-1"></div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
                             <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                              {(result.processing_metadata.maturation_distribution.ripe || 0) + 
-                               (result.processing_metadata.maturation_distribution['semi-ripe'] || 0)}
+                              {result.summary.maturation_counts.ripe || 0}
                             </p>
                           </div>
                           <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
                             <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mb-1"></div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
                             <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                              {result.processing_metadata.maturation_distribution.overripe || 0}
+                              {result.summary.maturation_counts.overripe || 0}
                             </p>
                           </div>
                         </div>

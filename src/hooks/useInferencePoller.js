@@ -26,6 +26,8 @@ const useInferencePoller = (requestId) => {
     setIsPolling(true);
     pollingActiveRef.current = true;
     setError(null);
+    setStatus(null);
+    setResult(null);
 
     const poll = async () => {
       try {

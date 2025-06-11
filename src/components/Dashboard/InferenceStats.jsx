@@ -43,7 +43,7 @@ const InferenceStats = ({ data, isLoading }) => {
   const maturationTrendData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
       new Date(a.processing_timestamp) - new Date(b.processing_timestamp)
     );
 
@@ -51,12 +51,12 @@ const InferenceStats = ({ data, isLoading }) => {
     sortedData.forEach(inference => {
       const date = new Date(inference.processing_timestamp);
       const day = date.toISOString().split('T')[0];
-      
+
       if (!groupedByDay[day]) {
         groupedByDay[day] = {
           date: day,
           green: 0,
-          ripe: 0, 
+          ripe: 0,
           overripe: 0,
           total: 0
         };
@@ -84,14 +84,14 @@ const InferenceStats = ({ data, isLoading }) => {
     const groupedByLocation = {};
     data.forEach(inference => {
       const location = inference.location || 'Desconhecido';
-      
+
       if (!groupedByLocation[location]) {
         groupedByLocation[location] = {
           location,
           count: 0
         };
       }
-      
+
       groupedByLocation[location].count++;
     });
 
@@ -108,6 +108,40 @@ const InferenceStats = ({ data, isLoading }) => {
               {`${entry.name}: ${entry.value}`}
             </p>
           ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const PieTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded shadow-md">
+          <p className="text-gray-900 dark:text-gray-200 font-medium">
+            {data.name}
+          </p>
+          <p style={{ color: data.color || data.fill }}>
+            Quantidade: {data.value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const BarTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded shadow-md">
+          <p className="text-gray-900 dark:text-gray-200 font-medium">
+            Local: {label}
+          </p>
+          <p style={{ color: data.color || data.fill }}>
+            Quantidade: {data.value}
+          </p>
         </div>
       );
     }
@@ -146,7 +180,7 @@ const InferenceStats = ({ data, isLoading }) => {
                     <Cell key={`cell-${entry.name}-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<PieTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
@@ -182,12 +216,18 @@ const InferenceStats = ({ data, isLoading }) => {
               <BarChart
                 key={`bar-${countsByLocationData.length}`}
                 data={countsByLocationData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="location" />
+                <XAxis
+                  dataKey="location"
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  interval={0}
+                />
                 <YAxis />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<BarTooltip />} />
                 <Legend />
                 <Bar dataKey="count" name="Quantidade" fill="#4ade80" />
               </BarChart>
