@@ -6,6 +6,46 @@ import useWebcamCapture from '../../hooks/useWebcamCapture';
 import useInferencePoller from '../../hooks/useInferencePoller';
 import { processImageCombined } from '../../api/inferenceApi';
 
+const getDeviceInfo = () => {
+  const userAgent = navigator.userAgent;
+  
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const isTablet = /iPad|Android(?!.*Mobile)/i.test(userAgent);
+  
+  let os = 'Unknown';
+  if (/Windows NT/i.test(userAgent)) os = 'Windows';
+  else if (/Mac OS X/i.test(userAgent)) os = 'macOS';
+  else if (/iPhone|iPad|iPod/i.test(userAgent)) os = 'iOS';
+  else if (/Android/i.test(userAgent)) os = 'Android';
+  else if (/Linux/i.test(userAgent)) os = 'Linux';
+  
+  let browser = 'Unknown';
+  if (/Chrome/i.test(userAgent) && !/Edge|Edg/i.test(userAgent)) browser = 'Chrome';
+  else if (/Firefox/i.test(userAgent)) browser = 'Firefox';
+  else if (/Safari/i.test(userAgent) && !/Chrome/i.test(userAgent)) browser = 'Safari';
+  else if (/Edge|Edg/i.test(userAgent)) browser = 'Edge';
+  else if (/Opera|OPR/i.test(userAgent)) browser = 'Opera';
+  
+  let captureMethod = 'webcam';
+  if (isMobile) {
+    captureMethod = 'mobile_camera';
+  } else if (isTablet) {
+    captureMethod = 'tablet_camera';
+  }
+  
+  const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  
+  return {
+    device_type: isMobile ? 'mobile' : isTablet ? 'tablet' : 'desktop',
+    os: os,
+    browser: browser,
+    capture_method: captureMethod,
+    has_camera_support: hasCamera,
+    screen_resolution: `${screen.width}x${screen.height}`,
+    user_agent: userAgent
+  };
+};
+
 const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
   const [step, setStep] = useState(1); // 1: permission, 2: captura, 3: Resultado
   const [location, setLocation] = useState('');
@@ -89,14 +129,16 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
       if (!uploadResult) {
         throw new Error('Erro ao fazer upload da imagem');
       }
+
+      const deviceInfo = getDeviceInfo();
       
       const metadata = {
         user_id: userId,
         image_id: uploadResult.imageId,
         location: location || 'Webcam',
-        source: 'webcam',
+        source: deviceInfo.capture_method,
         timestamp: new Date().toISOString(),
-        device_info: navigator.userAgent
+        device_info: deviceInfo,
       };
       
       const processResult = await processImageCombined(uploadResult.imageUrl, metadata);
