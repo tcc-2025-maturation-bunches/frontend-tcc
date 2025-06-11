@@ -7,21 +7,22 @@ import InferenceStats from '../components/Dashboard/InferenceStats';
 import DeviceMonitoringDashboard from '../components/DeviceMonitoring/DeviceMonitoringDashboard';
 import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
-import { getInferenceHistory } from '../api/inferenceApi';
-import { generateFakeInferenceHistory } from '../api/generateFakeData';
+import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
+import { getAllInferenceHistory, startHistoryPolling } from '../api/inferenceApi';
 import useAppConfig from '../hooks/useAppConfig';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { config: appConfig, isLoading: isConfigLoading } = useAppConfig();
-  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis' ou 'devices'
+  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'statistics' ou 'devices'
   const [inference, setInference] = useState(null);
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
-  const [useFakeData, setUseFakeData] = useState(true);
   const [selectedInference, setSelectedInference] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
 
   useEffect(() => {
     if (!isConfigLoading) {
@@ -29,23 +30,37 @@ const Dashboard = () => {
     }
   }, [isConfigLoading]);
 
+  useEffect(() => {
+    let stopPolling;
+    
+    if (pollingEnabled) {
+      stopPolling = startHistoryPolling(user.id, (error, data) => {
+        if (error) {
+          console.error('Polling error:', error);
+          setApiError('Erro no carregamento automático de dados');
+        } else if (data) {
+          setInferenceHistory(data);
+          if (data.length > 0) {
+            setInference(data[0]);
+          }
+        }
+      }, 30);
+    }
+
+    return () => {
+      if (stopPolling) {
+        stopPolling();
+      }
+    };
+  }, [pollingEnabled, user.id]);
+
   const loadInferenceHistory = async () => {
     try {
       setIsLoading(true);
+      setApiError(null);
       
-      let history;
-      if (useFakeData) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        history = generateFakeInferenceHistory();
-      } else {
-        try {
-          history = await getInferenceHistory(user.id);
-        } catch (error) {
-          console.warn('API not available, using fake data:', error);
-          setUseFakeData(true);
-          history = generateFakeInferenceHistory();
-        }
-      }
+      const allHistoryResponse = await getAllInferenceHistory(100);
+      const history = allHistoryResponse.items || [];
       
       setInferenceHistory(history);
       
@@ -57,12 +72,9 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error loading inference history:', error);
-      setUseFakeData(true);
-      const fakeHistory = generateFakeInferenceHistory();
-      setInferenceHistory(fakeHistory);
-      if (fakeHistory.length > 0) {
-        setInference(fakeHistory[0]);
-      }
+      setApiError(`Erro ao carregar dados da API: ${error.message}`);
+      setInferenceHistory([]);
+      setInference(null);
     } finally {
       setIsLoading(false);
     }
@@ -73,37 +85,49 @@ const Dashboard = () => {
     setIsDetailModalOpen(true);
   };
 
-  const handleInferenceCreated = (newInference) => {
-    const adaptedInference = {
-      ...newInference,
-      image_id: newInference.image_id || newInference.request_id,
-      processing_timestamp: new Date().toISOString(),
-      location: newInference.metadata?.location || 'Webcam',
-      status: newInference.status || 'completed',
-      results: newInference.detection?.results || [],
-      summary: {
-        total_objects: newInference.detection?.summary?.total_objects || 0,
-        average_maturation_score: newInference.detection?.summary?.average_maturation_score || 0,
-        average_confidence: newInference.detection?.results?.reduce((acc, r) => acc + r.confidence, 0) / (newInference.detection?.results?.length || 1) || 0,
-        total_processing_time_ms: newInference.processing_time_ms || 0,
-        detection_time_ms: newInference.detection?.summary?.detection_time_ms || 0,
-        maturation_analysis_time_ms: newInference.detection?.summary?.maturation_time_ms || 0,
-        maturation_counts: {
-          green: newInference.processing_metadata?.maturation_distribution?.unripe || 0,
-          ripe: (newInference.processing_metadata?.maturation_distribution?.ripe || 0) + 
-                (newInference.processing_metadata?.maturation_distribution?.['semi-ripe'] || 0),
-          overripe: newInference.processing_metadata?.maturation_distribution?.overripe || 0
-        }
-      }
-    };
-    
-    setInference(adaptedInference);
-    setInferenceHistory(prev => [adaptedInference, ...prev]);
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedInference(null);
   };
 
-  const toggleDataSource = () => {
-    setUseFakeData(!useFakeData);
-    loadInferenceHistory();
+  const handleInferenceCreated = (newInference) => {
+    if (!newInference || !newInference.image_id) {
+      console.warn('Inferência inválida recebida:', newInference);
+      return;
+    }
+    const formattedInference = {
+      ...newInference,
+      image_id: newInference.image_id || newInference.request_id,
+      processing_timestamp: newInference.processing_timestamp || new Date().toISOString(),
+      location: newInference.location || newInference.metadata?.location || 'Webcam',
+      status: newInference.status || 'completed',
+      results: newInference.results || [],
+      summary: newInference.summary || {},
+      metadata: newInference.metadata || {}
+    };
+    
+    setInferenceHistory(prev => {
+      const existingIndex = prev.findIndex(item => 
+        item.image_id === formattedInference.image_id || 
+        item.request_id === formattedInference.request_id
+      );
+      
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        const existingTime = new Date(existing.processing_timestamp);
+        const newTime = new Date(formattedInference.processing_timestamp);
+        
+        if (newTime >= existingTime) {
+          updated[existingIndex] = formattedInference;
+        }
+        return updated;
+      } else {
+        return [formattedInference, ...prev];
+      }
+    });
+    
+    setInference(formattedInference);
   };
 
   return (
@@ -111,18 +135,21 @@ const Dashboard = () => {
       <header className="bg-white dark:bg-gray-800 shadow-md">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Frutas</h1>
+            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Bananas Nanicas</h1>
             <div className="flex items-center space-x-4 mt-1">
               {appConfig && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Ambiente: {appConfig.environment} | Versão: {appConfig.version}
                 </p>
               )}
-              {useFakeData && (
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
-                  Usando dados de demonstração
+              {apiError && (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  {apiError}
                 </p>
               )}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Histórico: {inferenceHistory.length} análises encontradas
+              </p>
             </div>
           </div>
           <div className="flex items-center space-x-4">
@@ -135,7 +162,6 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        {/* Tabs de navegação */}
         <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
           <nav className="flex space-x-8">
             <button
@@ -153,6 +179,24 @@ const Dashboard = () => {
                 Análise de Imagens
               </div>
             </button>
+            
+            <button
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'statistics'
+                  ? 'border-green-500 text-green-600 dark:text-green-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+              onClick={() => setActiveTab('statistics')}
+            >
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                  <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                </svg>
+                Estatísticas
+              </div>
+            </button>
+            
             <button
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'devices'
@@ -196,15 +240,17 @@ const Dashboard = () => {
                 {isLoading ? 'Carregando...' : 'Atualizar Dados'}
               </button>
 
-              <button
-                onClick={toggleDataSource}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-150 flex items-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-                {useFakeData ? 'Usar API Real' : 'Usar Dados Fake'}
-              </button>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={pollingEnabled}
+                  onChange={(e) => setPollingEnabled(e.target.checked)}
+                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Auto-atualizar (30s)
+                </span>
+              </label>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -214,10 +260,25 @@ const Dashboard = () => {
                 onViewDetails={handleViewDetails} 
               />
               
-              <InferenceStats 
-                data={inferenceHistory} 
-                isLoading={isLoading} 
-              />
+              <div className="flex items-center justify-center min-h-[400px] bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+                <div className="text-center p-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    Estatísticas Detalhadas
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    Visualize gráficos e análises completas dos dados
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('statistics')}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-150"
+                  >
+                    Ver Estatísticas
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="mt-6">
@@ -228,10 +289,56 @@ const Dashboard = () => {
               />
             </div>
           </>
+        ) : activeTab === 'statistics' ? (
+          <>
+            <div className="mb-6 flex flex-wrap gap-4">
+              <button
+                onClick={loadInferenceHistory}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                {isLoading ? 'Carregando...' : 'Atualizar Estatísticas'}
+              </button>
+
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={pollingEnabled}
+                  onChange={(e) => setPollingEnabled(e.target.checked)}
+                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Auto-atualizar (30s)
+                </span>
+              </label>
+              
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                Baseado em {inferenceHistory.length} análises
+              </div>
+            </div>
+
+            <InferenceStats 
+              data={inferenceHistory} 
+              isLoading={isLoading} 
+            />
+          </>
         ) : (
           <DeviceMonitoringDashboard />
         )}
       </main>
+
+      {isDetailModalOpen && selectedInference && (
+        <InferenceDetailsModal 
+          inference={selectedInference} 
+          onClose={handleCloseDetailModal} 
+        />
+      )}
 
       {showWebcamModal && (
         <WebcamCaptureModal 

@@ -9,8 +9,8 @@ import {
   checkOfflineDevices,
   startDashboardPolling 
 } from '../../api/deviceMonitoringApi';
-import DeviceList from './DeviceDetailsModal';
-import DeviceDetailsModal from './DeviceList';
+import DeviceList from './DeviceList';
+import DeviceDetailsModal from './DeviceDetailsModal';
 import AddDeviceModal from './AddDeviceModal';
 
 const DeviceMonitoringDashboard = () => {

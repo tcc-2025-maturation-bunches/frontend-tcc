@@ -58,11 +58,15 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
       setIsProcessing(false);
       onInferenceCreated(result);
       setStep(3);
-    } else if (status?.status === 'error') {
+    } else if (status?.status === 'error' || status?.status === 'failed') {
       setIsProcessing(false);
-      setProcessingError(status.error_message || error || 'Erro desconhecido no processamento');
+      setProcessingError(status.error_message || 'Erro no processamento');
+    } else if (error) {
+      setIsProcessing(false);
+      setProcessingError(error);
     }
   }, [status, result, error, onInferenceCreated]);
+
 
   const handleCaptureClick = useCallback(async () => {
     const captured = captureImage();
@@ -78,6 +82,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
     try {
       setIsProcessing(true);
       setProcessingError(null);
+      setRequestId(null);
       
       const uploadResult = await uploadImage(userId);
       
@@ -96,12 +101,17 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
       
       const processResult = await processImageCombined(uploadResult.imageUrl, metadata);
       
+      if (!processResult?.request_id) {
+        throw new Error('Request ID não retornado pelo servidor');
+      }
+      
       setRequestId(processResult.request_id);
       
     } catch (error) {
       console.error('Error processing image:', error);
       setProcessingError(error.message || 'Erro desconhecido ao processar imagem');
       setIsProcessing(false);
+      setRequestId(null);
     }
   }, [userId, uploadImage, location]);
 
@@ -111,6 +121,7 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
     setRequestId(null);
     setIsProcessing(false);
     setProcessingError(null);
+    stopPolling();
   };
 
   const getProgressMessage = () => {
