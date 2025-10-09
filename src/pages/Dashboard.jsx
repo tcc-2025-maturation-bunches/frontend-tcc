@@ -4,44 +4,64 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import RecentInference from '../components/Dashboard/RecentInference';
 import InferenceHistoryTable from '../components/Dashboard/InferenceHistoryTable';
 import InferenceStats from '../components/Dashboard/InferenceStats';
+import InferenceStatsPreview from '../components/Dashboard/InferenceStatsPreview';
+import DeviceMonitoringDashboard from '../components/DeviceMonitoring/DeviceMonitoringDashboard';
 import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
-import WebSocketConfigModal from '../components/Dashboard/WebSocketConfigModal';
-import { getInferenceHistory } from '../api/inferenceApi';
-import { generateFakeInferenceHistory } from '../api/generateFakeData';
-import { useWebsocket } from '../contexts/WebsocketContext';
+import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
+import { getAllInferenceHistory, startHistoryPolling } from '../api/inferenceApi';
+import useAppConfig from '../hooks/useAppConfig';
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { isConnected, connect } = useWebsocket();
+  const { config: appConfig, isLoading: isConfigLoading } = useAppConfig();
+  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'statistics' ou 'devices'
   const [inference, setInference] = useState(null);
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
-  const [showWebSocketModal, setShowWebSocketModal] = useState(false);
-  const [useFakeData, setUseFakeData] = useState(true);
+  const [selectedInference, setSelectedInference] = useState(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [pollingEnabled, setPollingEnabled] = useState(false);
 
   useEffect(() => {
-    loadInferenceHistory();
-  }, []);
+    if (!isConfigLoading) {
+      loadInferenceHistory();
+    }
+  }, [isConfigLoading]);
+
+  useEffect(() => {
+    let stopPolling;
+    
+    if (pollingEnabled) {
+      stopPolling = startHistoryPolling(user.id, (error, data) => {
+        if (error) {
+          console.error('Polling error:', error);
+          setApiError('Erro no carregamento automático de dados');
+        } else if (data) {
+          setInferenceHistory(data);
+          if (data.length > 0) {
+            setInference(data[0]);
+          }
+        }
+      }, 30);
+    }
+
+    return () => {
+      if (stopPolling) {
+        stopPolling();
+      }
+    };
+  }, [pollingEnabled, user.id]);
 
   const loadInferenceHistory = async () => {
     try {
       setIsLoading(true);
+      setApiError(null);
       
-      let history;
-      if (useFakeData) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        history = generateFakeInferenceHistory();
-      } else {
-        try {
-          history = await getInferenceHistory(user.id);
-        } catch (error) {
-          console.warn('API not available, using fake data:', error);
-          setUseFakeData(true);
-          history = generateFakeInferenceHistory();
-        }
-      }
+      const allHistoryResponse = await getAllInferenceHistory(100);
+      const history = allHistoryResponse.items || [];
       
       setInferenceHistory(history);
       
@@ -53,12 +73,9 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error('Error loading inference history:', error);
-      setUseFakeData(true);
-      const fakeHistory = generateFakeInferenceHistory();
-      setInferenceHistory(fakeHistory);
-      if (fakeHistory.length > 0) {
-        setInference(fakeHistory[0]);
-      }
+      setApiError(`Erro ao carregar dados da API: ${error.message}`);
+      setInferenceHistory([]);
+      setInference(null);
     } finally {
       setIsLoading(false);
     }
@@ -69,22 +86,53 @@ const Dashboard = () => {
     setIsDetailModalOpen(true);
   };
 
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedInference(null);
+  };
+
   const handleInferenceCreated = (newInference) => {
-    setInference(newInference);
-    setInferenceHistory(prev => [newInference, ...prev]);
-  };
-
-  const handleWebSocketConnect = async (url) => {
-    try {
-      await connect(url);
-    } catch (error) {
-      console.error('WebSocket connection error:', error);
+    if (newInference?.action === 'reopen_modal') {
+      setShowWebcamModal(true);
+      return;
     }
-  };
-
-  const toggleDataSource = () => {
-    setUseFakeData(!useFakeData);
-    loadInferenceHistory();
+    if (!newInference || !newInference.image_id) {
+      console.warn('Inferência inválida recebida:', newInference);
+      return;
+    }
+    const formattedInference = {
+      ...newInference,
+      image_id: newInference.image_id || newInference.request_id,
+      processing_timestamp: newInference.processing_timestamp || new Date().toISOString(),
+      location: newInference.location || newInference.metadata?.location || 'Webcam',
+      status: newInference.status || 'completed',
+      results: newInference.results || [],
+      summary: newInference.summary || {},
+      metadata: newInference.metadata || {}
+    };
+    
+    setInferenceHistory(prev => {
+      const existingIndex = prev.findIndex(item => 
+        item.image_id === formattedInference.image_id || 
+        item.request_id === formattedInference.request_id
+      );
+      
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        const existingTime = new Date(existing.processing_timestamp);
+        const newTime = new Date(formattedInference.processing_timestamp);
+        
+        if (newTime >= existingTime) {
+          updated[existingIndex] = formattedInference;
+        }
+        return updated;
+      } else {
+        return [formattedInference, ...prev];
+      }
+    });
+    
+    setInference(formattedInference);
   };
 
   return (
@@ -93,11 +141,21 @@ const Dashboard = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Bananas Nanicas</h1>
-            {useFakeData && (
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-                Usando dados de demonstração
+            <div className="flex items-center space-x-4 mt-1">
+              {appConfig && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Ambiente: {appConfig.environment} | Versão: {appConfig.version}
+                </p>
+              )}
+              {apiError && (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  {apiError}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Histórico: {inferenceHistory.length} análises encontradas
               </p>
-            )}
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <ThemeToggle />
@@ -109,84 +167,174 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <div className="mb-6 flex flex-wrap gap-4">
-          <button
-            onClick={() => setShowWebcamModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-150 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-            Realizar Análise
-          </button>
-          
-          <button
-            onClick={() => setShowWebSocketModal(true)}
-            className={`px-4 py-2 ${isConnected ? 'bg-blue-600' : 'bg-gray-600'} text-white rounded-md hover:bg-opacity-90 transition-colors duration-150 flex items-center`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5.05 3.636a1 1 0 010 1.414 7 7 0 000 9.9 1 1 0 11-1.414 1.414 9 9 0 010-12.728 1 1 0 011.414 0zm9.9 0a1 1 0 011.414 0 9 9 0 010 12.728 1 1 0 11-1.414-1.414 7 7 0 000-9.9 1 1 0 010-1.414zM7.879 6.464a1 1 0 010 1.414 3 3 0 000 4.243 1 1 0 11-1.414 1.414 5 5 0 010-7.07 1 1 0 011.414 0zm4.242 0a1 1 0 011.414 0 5 5 0 010 7.072 1 1 0 01-1.414-1.414 3 3 0 000-4.244 1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            {isConnected ? 'WebSocket Conectado' : 'Configurar WebSocket'}
-          </button>
-          
-          <button
-            onClick={loadInferenceHistory}
-            disabled={isLoading}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            {isLoading ? 'Carregando...' : 'Atualizar Dados'}
-          </button>
-
-          <button
-            onClick={toggleDataSource}
-            className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors duration-150 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-            {useFakeData ? 'Usar API Real' : 'Usar Dados Fake'}
-          </button>
+        <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+          <nav className="flex space-x-8">
+            <button
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'analysis'
+                  ? 'border-green-500 text-green-600 dark:text-green-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+              onClick={() => setActiveTab('analysis')}
+            >
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm0 2h12v10H4V5zm6 2a3 3 0 110 6 3 3 0 010-6z" />
+                </svg>
+                Análise de Imagens
+              </div>
+            </button>
+            
+            <button
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'statistics'
+                  ? 'border-green-500 text-green-600 dark:text-green-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+              onClick={() => setActiveTab('statistics')}
+            >
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z" />
+                  <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z" />
+                </svg>
+                Estatísticas
+              </div>
+            </button>
+            
+            <button
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'devices'
+                  ? 'border-green-500 text-green-600 dark:text-green-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+              onClick={() => setActiveTab('devices')}
+            >
+              <div className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M13 7H7v6h6V7z" />
+                  <path fillRule="evenodd" d="M7 2a1 1 0 012 0v1h2V2a1 1 0 112 0v1h2a2 2 0 012 2v2h1a1 1 0 110 2h-1v2h1a1 1 0 110 2h-1v2a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H9v1a1 1 0 11-2 0v-1H5a2 2 0 01-2-2v-2H2a1 1 0 110-2h1V9H2a1 1 0 010-2h1V5a2 2 0 012-2h2V2z" clipRule="evenodd" />
+                </svg>
+                Monitoramento de Dispositivos
+              </div>
+            </button>
+          </nav>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <RecentInference 
-            inference={inference} 
-            isLoading={isLoading} 
-            onViewDetails={handleViewDetails} 
-          />
-          
-          <InferenceStats 
-            data={inferenceHistory} 
-            isLoading={isLoading} 
-          />
-        </div>
+        {activeTab === 'analysis' ? (
+          <>
+            <div className="mb-6 flex flex-wrap gap-4">
+              <button
+                onClick={() => setShowWebcamModal(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors duration-150 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 5a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-1.586a1 1 0 01-.707-.293l-1.121-1.121A2 2 0 0011.172 3H8.828a2 2 0 00-1.414.586L6.293 4.707A1 1 0 015.586 5H4zm6 9a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                Realizar Análise
+              </button>
+              
+              <button
+                onClick={loadInferenceHistory}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                {isLoading ? 'Carregando...' : 'Atualizar Dados'}
+              </button>
 
-        <div className="mt-6">
-          <InferenceHistoryTable 
-            data={inferenceHistory} 
-            isLoading={isLoading} 
-            onViewDetails={handleViewDetails} 
-          />
-        </div>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={pollingEnabled}
+                  onChange={(e) => setPollingEnabled(e.target.checked)}
+                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Auto-atualizar (30s)
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <RecentInference 
+                inference={inference} 
+                isLoading={isLoading} 
+                onViewDetails={handleViewDetails} 
+              />
+              
+              <InferenceStatsPreview 
+                data={inferenceHistory} 
+                isLoading={isLoading} 
+                onViewDetails={() => setActiveTab('statistics')}
+              />
+            </div>
+
+            <div className="mt-6">
+              <InferenceHistoryTable 
+                data={inferenceHistory} 
+                isLoading={isLoading} 
+                onViewDetails={handleViewDetails} 
+              />
+            </div>
+          </>
+        ) : activeTab === 'statistics' ? (
+          <>
+            <div className="mb-6 flex flex-wrap gap-4">
+              <button
+                onClick={loadInferenceHistory}
+                disabled={isLoading}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 mr-2 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                {isLoading ? 'Carregando...' : 'Atualizar Estatísticas'}
+              </button>
+
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={pollingEnabled}
+                  onChange={(e) => setPollingEnabled(e.target.checked)}
+                  className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                  Auto-atualizar (30s)
+                </span>
+              </label>
+              
+              <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+                Baseado em {inferenceHistory.length} análises
+              </div>
+            </div>
+
+            <InferenceStats 
+              data={inferenceHistory} 
+              isLoading={isLoading} 
+            />
+          </>
+        ) : (
+          <DeviceMonitoringDashboard />
+        )}
       </main>
+
+      {isDetailModalOpen && selectedInference && (
+        <InferenceDetailsModal 
+          inference={selectedInference} 
+          onClose={handleCloseDetailModal} 
+        />
+      )}
 
       {showWebcamModal && (
         <WebcamCaptureModal 
           onClose={() => setShowWebcamModal(false)} 
           onInferenceCreated={handleInferenceCreated}
-          userId={user.id}
-        />
-      )}
-
-      {showWebSocketModal && (
-        <WebSocketConfigModal 
-          onClose={() => setShowWebSocketModal(false)} 
-          onConnect={handleWebSocketConnect}
-          isConnected={isConnected}
           userId={user.id}
         />
       )}

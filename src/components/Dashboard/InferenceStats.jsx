@@ -43,7 +43,7 @@ const InferenceStats = ({ data, isLoading }) => {
   const maturationTrendData = useMemo(() => {
     if (!data || data.length === 0) return [];
 
-    const sortedData = [...data].sort((a, b) => 
+    const sortedData = [...data].sort((a, b) =>
       new Date(a.processing_timestamp) - new Date(b.processing_timestamp)
     );
 
@@ -51,12 +51,12 @@ const InferenceStats = ({ data, isLoading }) => {
     sortedData.forEach(inference => {
       const date = new Date(inference.processing_timestamp);
       const day = date.toISOString().split('T')[0];
-      
+
       if (!groupedByDay[day]) {
         groupedByDay[day] = {
           date: day,
           green: 0,
-          ripe: 0, 
+          ripe: 0,
           overripe: 0,
           total: 0
         };
@@ -84,14 +84,14 @@ const InferenceStats = ({ data, isLoading }) => {
     const groupedByLocation = {};
     data.forEach(inference => {
       const location = inference.location || 'Desconhecido';
-      
+
       if (!groupedByLocation[location]) {
         groupedByLocation[location] = {
           location,
           count: 0
         };
       }
-      
+
       groupedByLocation[location].count++;
     });
 
@@ -114,10 +114,45 @@ const InferenceStats = ({ data, isLoading }) => {
     return null;
   };
 
+  const PieTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded shadow-md">
+          <p className="text-gray-900 dark:text-gray-200 font-medium">
+            {data.name}
+          </p>
+          <p style={{ color: data.color || data.fill }}>
+            Quantidade: {data.value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const BarTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0];
+      return (
+        <div className="bg-white dark:bg-gray-800 p-2 border border-gray-200 dark:border-gray-700 rounded shadow-md">
+          <p className="text-gray-900 dark:text-gray-200 font-medium">
+            Local: {label}
+          </p>
+          <p style={{ color: data.color || data.fill }}>
+            Quantidade: {data.value}
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Card
       title="Estatísticas de Maturação"
       className="h-full"
+      key={`stats-${data?.length || 0}`}
     >
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
@@ -125,13 +160,12 @@ const InferenceStats = ({ data, isLoading }) => {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Gráfico de pizza para distribuição de maturação */}
-          <div className="h-64">
+          <div className="h-64" key="pie-chart">
             <h3 className="text-base font-medium mb-2 text-gray-700 dark:text-gray-300">
               Distribuição de Maturação
             </h3>
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
+              <PieChart key={`pie-${maturationDistributionData.length}`}>
                 <Pie
                   data={maturationDistributionData}
                   cx="50%"
@@ -143,22 +177,22 @@ const InferenceStats = ({ data, isLoading }) => {
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
                   {maturationDistributionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${entry.name}-${index}`} fill={entry.color || COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<PieTooltip />} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           </div>
 
-          {/* Gráfico de linha para tendência de maturação */}
-          <div className="h-64">
+          <div className="h-64" key="line-chart">
             <h3 className="text-base font-medium mb-2 text-gray-700 dark:text-gray-300">
               Tendência de Maturação por Dia
             </h3>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
+                key={`line-${maturationTrendData.length}`}
                 data={maturationTrendData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
@@ -174,20 +208,26 @@ const InferenceStats = ({ data, isLoading }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Gráfico de barras para contagem de análises por local */}
-          <div className="h-64 md:col-span-2">
+          <div className="h-64 md:col-span-2" key="bar-chart">
             <h3 className="text-base font-medium mb-2 text-gray-700 dark:text-gray-300">
               Análises por Local
             </h3>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
+                key={`bar-${countsByLocationData.length}`}
                 data={countsByLocationData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                margin={{ top: 5, right: 30, left: 20, bottom: 50 }}
               >
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="location" />
+                <XAxis
+                  dataKey="location"
+                  angle={-45}
+                  textAnchor="end"
+                  height={60}
+                  interval={0}
+                />
                 <YAxis />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<BarTooltip />} />
                 <Legend />
                 <Bar dataKey="count" name="Quantidade" fill="#4ade80" />
               </BarChart>
@@ -197,6 +237,6 @@ const InferenceStats = ({ data, isLoading }) => {
       )}
     </Card>
   );
-};
+}
 
 export default InferenceStats;
