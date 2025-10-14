@@ -4,8 +4,7 @@ import Button from '../common/Button';
 import Loader from '../common/Loader';
 import { 
   getDashboardData, 
-  listDevices, 
-  updateDeviceStatus,
+  listDevices,
   checkOfflineDevices,
   startDashboardPolling 
 } from '../../api/deviceMonitoringApi';
@@ -21,7 +20,7 @@ const DeviceMonitoringDashboard = () => {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [filter, setFilter] = useState({ status: null, location: null });
+  const [filter, setFilter] = useState({ status_filter: null, location_filter: null });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
@@ -57,7 +56,8 @@ const DeviceMonitoringDashboard = () => {
     try {
       setIsLoading(true);
       const response = await listDevices(filter);
-      setDevices(response.devices || []);
+      const devicesList = Array.isArray(response) ? response : (response.devices || []);
+      setDevices(devicesList);
     } catch (err) {
       console.error('Erro ao carregar dispositivos:', err);
       setError('Erro ao carregar lista de dispositivos');
@@ -81,14 +81,9 @@ const DeviceMonitoringDashboard = () => {
     }
   };
 
-  const handleDeviceStatusUpdate = async (deviceId, newStatus) => {
-    try {
-      await updateDeviceStatus(deviceId, newStatus);
-      await loadDevices();
-      await loadDashboardData();
-    } catch (err) {
-      console.error('Erro ao atualizar status do dispositivo:', err);
-    }
+  const handleDeviceStatusUpdate = async () => {
+    await loadDevices();
+    await loadDashboardData();
   };
 
   const handleViewDetails = (device) => {
@@ -118,7 +113,6 @@ const DeviceMonitoringDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header com ações */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
           Monitoramento de Dispositivos
@@ -152,7 +146,6 @@ const DeviceMonitoringDashboard = () => {
         </div>
       </div>
 
-      {/* Cards de Status */}
       {dashboardData && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatusCard
@@ -198,7 +191,6 @@ const DeviceMonitoringDashboard = () => {
         </div>
       )}
 
-      {/* Filtros */}
       <Card>
         <div className="flex flex-wrap gap-4">
           <div>
@@ -207,8 +199,8 @@ const DeviceMonitoringDashboard = () => {
             </label>
             <select
               className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:text-white"
-              value={filter.status || ''}
-              onChange={(e) => setFilter({ ...filter, status: e.target.value || null })}
+              value={filter.status_filter || ''}
+              onChange={(e) => setFilter({ ...filter, status_filter: e.target.value || null })}
             >
               <option value="">Todos</option>
               <option value="online">Online</option>
@@ -225,14 +217,13 @@ const DeviceMonitoringDashboard = () => {
               type="text"
               className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 dark:bg-gray-700 dark:text-white"
               placeholder="Digite o local..."
-              value={filter.location || ''}
-              onChange={(e) => setFilter({ ...filter, location: e.target.value || null })}
+              value={filter.location_filter || ''}
+              onChange={(e) => setFilter({ ...filter, location_filter: e.target.value || null })}
             />
           </div>
         </div>
       </Card>
 
-      {/* Lista de Dispositivos */}
       {error ? (
         <Card>
           <div className="text-center py-8">
@@ -256,7 +247,6 @@ const DeviceMonitoringDashboard = () => {
         />
       )}
 
-      {/* Modais */}
       {showDetailsModal && selectedDevice && (
         <DeviceDetailsModal
           device={selectedDevice}

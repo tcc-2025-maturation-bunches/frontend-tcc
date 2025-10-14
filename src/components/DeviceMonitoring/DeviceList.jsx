@@ -144,24 +144,6 @@ const DeviceList = ({ devices, onStatusUpdate, onViewDetails }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex justify-end space-x-2">
-                      {device.status === 'online' && (
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => onStatusUpdate(device.device_id, 'maintenance')}
-                        >
-                          Manutenção
-                        </Button>
-                      )}
-                      {device.status === 'maintenance' && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={() => onStatusUpdate(device.device_id, 'online')}
-                        >
-                          Ativar
-                        </Button>
-                      )}
                       <Button
                         variant="outline"
                         size="sm"

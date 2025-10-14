@@ -53,6 +53,21 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
     return counts;
   };
 
+  const handleViewDetails = async () => {
+    try {
+      if (inference.request_id) {
+        const { getInferenceDetails } = await import('../../api/inferenceApi');
+        const detailedInference = await getInferenceDetails(inference.request_id);
+        onViewDetails(detailedInference);
+      } else {
+        onViewDetails(inference);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes:', error);
+      onViewDetails(inference);
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
@@ -273,7 +288,7 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
           <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
             <Button
               variant="primary"
-              onClick={() => onViewDetails(inference)}
+              onClick={handleViewDetails}
               className="flex items-center"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">

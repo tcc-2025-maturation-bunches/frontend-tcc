@@ -47,7 +47,11 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalhes da Análise</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">ID: {inference.image_id}</p>
+            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <span>ID: {inference.image_id}</span>
+              {inference.request_id && <span>Request: {inference.request_id}</span>}
+              {inference.device_id && <span>Device: {inference.device_id}</span>}
+            </div>
           </div>
           <button 
             onClick={onClose}
@@ -61,45 +65,48 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
-              <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Imagens</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Imagem Original</h4>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
-                    <img
-                      src={inference.image_url}
-                      alt="Imagem original"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Imagem+Original';
-                      }}
-                    />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div>
+              <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Imagem Original</h4>
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
+                {inference.image_url ? (
+                  <img
+                    src={inference.image_url}
+                    alt="Imagem original"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Imagem+Original';
+                    }}
+                  />
+                ) : (
+                  <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
+                    <p>Imagem original não disponível</p>
                   </div>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Resultado da Análise</h4>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
-                    {inference.image_result_url ? (
-                      <img
-                        src={inference.image_result_url}
-                        alt="Resultado da análise"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Análise';
-                        }}
-                      />
-                    ) : (
-                      <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
-                        <p>Resultado não disponível</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Resultado da Análise</h4>
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
+                {inference.image_result_url ? (
+                  <img
+                    src={inference.image_result_url}
+                    alt="Resultado da análise"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Análise';
+                    }}
+                  />
+                ) : (
+                  <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
+                    <p>Resultado não disponível</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div>
               <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Resumo da Análise</h3>
               <div className="space-y-4">
@@ -157,9 +164,7 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Informações Gerais</h3>
               <dl className="space-y-3">
@@ -189,68 +194,25 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Fonte:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
                     {inference.metadata?.source === 'webcam' ? 'Webcam' : 
-                     inference.metadata?.source === 'monitoring' ? 'Monitoramento' : 'N/A'}
+                     inference.metadata?.source === 'monitoring' ? 'Monitoramento' : 
+                     inference.device_id ? 'Dispositivo' : 'N/A'}
                   </dd>
                 </div>
-                {inference.metadata?.environmental && (
-                  <>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Iluminação:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200 capitalize">
-                        {inference.metadata.environmental.lighting_conditions || 'N/A'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Temperatura Est.:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.environmental.estimated_temperature 
-                          ? `${inference.metadata.environmental.estimated_temperature}°C` 
-                          : 'N/A'}
-                      </dd>
-                    </div>
-                  </>
+                {inference.device_id && (
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Dispositivo:</dt>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                      {inference.device_id}
+                    </dd>
+                  </div>
                 )}
-              </dl>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Tempos de Processamento</h3>
-              <dl className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Detecção:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.detection_time_ms)}
-                  </dd>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Análise de Maturação:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.maturation_analysis_time_ms)}
-                  </dd>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Tempo Total:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.total_processing_time_ms)}
-                  </dd>
-                </div>
-                {inference.metadata?.camera_settings && (
-                  <>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Resolução:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.camera_settings.resolution || 'N/A'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Qualidade:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.camera_settings.quality 
-                          ? `${inference.metadata.camera_settings.quality}%` 
-                          : 'N/A'}
-                      </dd>
-                    </div>
-                  </>
+                {inference.metadata?.image_dimensions && (
+                  <div className="flex justify-between py-2">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Dimensões:</dt>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                      {inference.metadata.image_dimensions.width} x {inference.metadata.image_dimensions.height}
+                    </dd>
+                  </div>
                 )}
               </dl>
             </div>
