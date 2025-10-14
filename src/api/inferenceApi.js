@@ -225,18 +225,12 @@ const transformBackendDataToFrontend = (backendData) => {
     const naoAnalisado = safeParseInt(maturationDist.nao_analisado, 0);
     
     const maturationCounts = {
-      green: verde,
-      ripe: quaseMadura + madura,
-      overripe: muitoMadura + passada,
-      not_analyzed: naoAnalisado,
-    };
-
-    const categoryMap = {
-      'verde': 'green',
-      'quase_madura': 'ripe',
-      'madura': 'ripe', 
-      'muito_madura': 'overripe',
-      'passada': 'overripe'
+      verde: verde,
+      quase_madura: quaseMadura,
+      madura: madura,
+      muito_madura: muitoMadura,
+      passada: passada,
+      nao_analisado: naoAnalisado,
     };
     
     return {
@@ -255,9 +249,8 @@ const transformBackendDataToFrontend = (backendData) => {
         confidence: safeParseFloat(r.confidence),
         bounding_box: (r.bounding_box || []).map(b => safeParseFloat(b)),
         maturation_level: r.maturation_level ? {
-          category: categoryMap[r.maturation_level.category] || r.maturation_level.category,
+          category: r.maturation_level.category,
           score: safeParseFloat(r.maturation_level.score),
-          original_category: r.maturation_level.category,
           estimated_days_until_spoilage: r.maturation_level.estimated_days_until_spoilage
         } : null
       })),

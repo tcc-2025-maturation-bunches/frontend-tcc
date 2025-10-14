@@ -3,11 +3,13 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import Card from '../common/Card';
 import Loader from '../common/Loader';
 
-const COLORS = ['#22c55e', '#eab308', '#ef4444'];
+const COLORS = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'];
 const MATURATION_CATEGORIES = {
-  'green': { label: 'Verdes', color: '#22c55e' },
-  'ripe': { label: 'Maduras', color: '#eab308' },
-  'overripe': { label: 'Passadas', color: '#ef4444' }
+  'verde': { label: 'Verdes', color: '#22c55e' },
+  'quase_madura': { label: 'Quase Maduras', color: '#84cc16' },
+  'madura': { label: 'Maduras', color: '#eab308' },
+  'muito_madura': { label: 'Muito Maduras', color: '#f97316' },
+  'passada': { label: 'Passadas', color: '#ef4444' }
 };
 
 const InferenceStats = ({ data, isLoading }) => {
@@ -15,16 +17,20 @@ const InferenceStats = ({ data, isLoading }) => {
     if (!data || data.length === 0) return [];
 
     const counts = {
-      green: 0,
-      ripe: 0,
-      overripe: 0
+      verde: 0,
+      quase_madura: 0,
+      madura: 0,
+      muito_madura: 0,
+      passada: 0
     };
 
     data.forEach(inference => {
       if (inference.summary?.maturation_counts) {
-        counts.green += inference.summary.maturation_counts.green || 0;
-        counts.ripe += inference.summary.maturation_counts.ripe || 0;
-        counts.overripe += inference.summary.maturation_counts.overripe || 0;
+        counts.verde += inference.summary.maturation_counts.verde || 0;
+        counts.quase_madura += inference.summary.maturation_counts.quase_madura || 0;
+        counts.madura += inference.summary.maturation_counts.madura || 0;
+        counts.muito_madura += inference.summary.maturation_counts.muito_madura || 0;
+        counts.passada += inference.summary.maturation_counts.passada || 0;
       } else if (inference.results && Array.isArray(inference.results)) {
         inference.results.forEach(result => {
           if (result.maturation_level && result.maturation_level.category) {
@@ -63,21 +69,27 @@ const InferenceStats = ({ data, isLoading }) => {
       if (!groupedByDay[formattedDay]) {
         groupedByDay[formattedDay] = {
           date: formattedDay,
-          green: 0,
-          ripe: 0,
-          overripe: 0,
+          verde: 0,
+          quase_madura: 0,
+          madura: 0,
+          muito_madura: 0,
+          passada: 0,
           total: 0
         };
       }
 
       if (inference.summary?.maturation_counts) {
-        groupedByDay[formattedDay].green += inference.summary.maturation_counts.green || 0;
-        groupedByDay[formattedDay].ripe += inference.summary.maturation_counts.ripe || 0;
-        groupedByDay[formattedDay].overripe += inference.summary.maturation_counts.overripe || 0;
+        groupedByDay[formattedDay].verde += inference.summary.maturation_counts.verde || 0;
+        groupedByDay[formattedDay].quase_madura += inference.summary.maturation_counts.quase_madura || 0;
+        groupedByDay[formattedDay].madura += inference.summary.maturation_counts.madura || 0;
+        groupedByDay[formattedDay].muito_madura += inference.summary.maturation_counts.muito_madura || 0;
+        groupedByDay[formattedDay].passada += inference.summary.maturation_counts.passada || 0;
         groupedByDay[formattedDay].total += 
-          (inference.summary.maturation_counts.green || 0) +
-          (inference.summary.maturation_counts.ripe || 0) +
-          (inference.summary.maturation_counts.overripe || 0);
+          (inference.summary.maturation_counts.verde || 0) +
+          (inference.summary.maturation_counts.quase_madura || 0) +
+          (inference.summary.maturation_counts.madura || 0) +
+          (inference.summary.maturation_counts.muito_madura || 0) +
+          (inference.summary.maturation_counts.passada || 0);
       } else if (inference.results && Array.isArray(inference.results)) {
         inference.results.forEach(result => {
           if (result.maturation_level && result.maturation_level.category) {
@@ -105,18 +117,22 @@ const InferenceStats = ({ data, isLoading }) => {
         groupedByLocation[location] = {
           location,
           count: 0,
-          green: 0,
-          ripe: 0,
-          overripe: 0
+          verde: 0,
+          quase_madura: 0,
+          madura: 0,
+          muito_madura: 0,
+          passada: 0
         };
       }
 
       groupedByLocation[location].count++;
 
       if (inference.summary?.maturation_counts) {
-        groupedByLocation[location].green += inference.summary.maturation_counts.green || 0;
-        groupedByLocation[location].ripe += inference.summary.maturation_counts.ripe || 0;
-        groupedByLocation[location].overripe += inference.summary.maturation_counts.overripe || 0;
+        groupedByLocation[location].verde += inference.summary.maturation_counts.verde || 0;
+        groupedByLocation[location].quase_madura += inference.summary.maturation_counts.quase_madura || 0;
+        groupedByLocation[location].madura += inference.summary.maturation_counts.madura || 0;
+        groupedByLocation[location].muito_madura += inference.summary.maturation_counts.muito_madura || 0;
+        groupedByLocation[location].passada += inference.summary.maturation_counts.passada || 0;
       }
     });
 
@@ -177,16 +193,22 @@ const InferenceStats = ({ data, isLoading }) => {
           <p className="text-blue-600 dark:text-blue-400 text-sm font-semibold">
             Análises: {payload[0]?.value || 0}
           </p>
-          {payload[0]?.payload?.green !== undefined && (
+          {payload[0]?.payload?.verde !== undefined && (
             <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600 space-y-1">
-              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.green.color }}>
-                Verdes: {payload[0].payload.green}
+              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.verde.color }}>
+                Verdes: {payload[0].payload.verde}
               </p>
-              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.ripe.color }}>
-                Maduras: {payload[0].payload.ripe}
+              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.quase_madura.color }}>
+                Quase Maduras: {payload[0].payload.quase_madura}
               </p>
-              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.overripe.color }}>
-                Passadas: {payload[0].payload.overripe}
+              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.madura.color }}>
+                Maduras: {payload[0].payload.madura}
+              </p>
+              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.muito_madura.color }}>
+                Muito Maduras: {payload[0].payload.muito_madura}
+              </p>
+              <p className="text-xs" style={{ color: MATURATION_CATEGORIES.passada.color }}>
+                Passadas: {payload[0].payload.passada}
               </p>
             </div>
           )}
@@ -269,27 +291,45 @@ const InferenceStats = ({ data, isLoading }) => {
                 <Legend wrapperStyle={{ fontSize: 14 }} />
                 <Line 
                   type="monotone" 
-                  dataKey="green" 
-                  stroke={MATURATION_CATEGORIES.green.color} 
-                  name={MATURATION_CATEGORIES.green.label}
+                  dataKey="verde" 
+                  stroke={MATURATION_CATEGORIES.verde.color} 
+                  name={MATURATION_CATEGORIES.verde.label}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
                 />
                 <Line 
                   type="monotone" 
-                  dataKey="ripe" 
-                  stroke={MATURATION_CATEGORIES.ripe.color} 
-                  name={MATURATION_CATEGORIES.ripe.label}
+                  dataKey="quase_madura" 
+                  stroke={MATURATION_CATEGORIES.quase_madura.color} 
+                  name={MATURATION_CATEGORIES.quase_madura.label}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
                 />
                 <Line 
                   type="monotone" 
-                  dataKey="overripe" 
-                  stroke={MATURATION_CATEGORIES.overripe.color} 
-                  name={MATURATION_CATEGORIES.overripe.label}
+                  dataKey="madura" 
+                  stroke={MATURATION_CATEGORIES.madura.color} 
+                  name={MATURATION_CATEGORIES.madura.label}
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="muito_madura" 
+                  stroke={MATURATION_CATEGORIES.muito_madura.color} 
+                  name={MATURATION_CATEGORIES.muito_madura.label}
+                  strokeWidth={2}
+                  dot={{ r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="passada" 
+                  stroke={MATURATION_CATEGORIES.passada.color} 
+                  name={MATURATION_CATEGORIES.passada.label}
                   strokeWidth={2}
                   dot={{ r: 4 }}
                   activeDot={{ r: 6 }}
