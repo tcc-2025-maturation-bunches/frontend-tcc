@@ -7,25 +7,30 @@ const LoginForm = ({ onLogin }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSubmit = e => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    onLogin({ username, password });
+    
+    if (!username.trim() || !password.trim()) {
+      return;
+    }
+    
+    onLogin({ username: username.trim(), password });
   };
 
   return (
     <form className="login-form" onSubmit={handleSubmit}>
       <Input
-        //label="Usuário"
+        label="Usuário"
         type="text"
         value={username}
-        onChange={e => setUsername(e.target.value)}
+        onChange={(e) => setUsername(e.target.value)}
         placeholder="Digite seu usuário"
       />
       <Input
-        //label="Senha"
+        label="Senha"
         type="password"
         value={password}
-        onChange={e => setPassword(e.target.value)}
+        onChange={(e) => setPassword(e.target.value)}
         placeholder="Digite sua senha"
       />
       <ButtonLogin type="submit">Entrar</ButtonLogin>

@@ -1,42 +1,49 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import LoginHeader from '../../components/Login/LoginHeader/LoginHeader';
+import LoginForm from '../../components/Login/LoginForm/LoginForm';
 import Loader from '../../components/common/Loader';
-import { toast } from 'react-toastify';
 import './Login.css';
 
 const Login = () => {
   const { login } = useAuth();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleLogin = async ({ username, password }) => {
     if (!username.trim() || !password.trim()) {
-      setError('Por favor, preencha todos os campos');
+      const errorMsg = 'Por favor, preencha todos os campos';
+      setError(errorMsg);
+      setSuccess('');
       return;
     }
 
     setIsLoading(true);
     setError('');
+    setSuccess('');
 
     try {
+      console.log('Tentando fazer login...');
       const result = await login(username, password);
       
+      console.log('Resultado do login:', result);
+      
       if (result.success) {
-        toast.success('Login realizado com sucesso!');
+        setSuccess('Login realizado com sucesso! Carregando...');
+        console.log('Login bem-sucedido, aguardando redirecionamento...');
       } else {
-        setError(result.error || 'Credenciais inválidas');
-        toast.error(result.error || 'Credenciais inválidas');
+        const errorMsg = result.error || 'Usuário ou senha inválidos';
+        console.error('Erro no login:', errorMsg);
+        setError(errorMsg);
+        setSuccess('');
+        setIsLoading(false);
       }
     } catch (err) {
-      const errorMessage = err.response?.data?.detail || 'Erro ao fazer login';
+      console.error('Exceção no login:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Erro ao fazer login';
       setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
+      setSuccess('');
       setIsLoading(false);
     }
   };
@@ -46,55 +53,44 @@ const Login = () => {
       <div className="login-card">
         <LoginHeader />
         
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-4 py-3 rounded">
-              {error}
+        {error && !isLoading && (
+          <div className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 px-4 py-3 rounded mb-4 animate-fade-in border-l-4 border-red-500">
+            <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="font-bold text-lg">{error}</p>
+                <p className="text-sm mt-1">Verifique suas credenciais e tente novamente</p>
+              </div>
             </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Usuário
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Digite seu usuário"
-              disabled={isLoading}
-              autoComplete="username"
-            />
           </div>
+        )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              Senha
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Digite sua senha"
-              disabled={isLoading}
-              autoComplete="current-password"
-            />
+        {success && (
+          <div className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 px-4 py-3 rounded mb-4 animate-fade-in border-l-4 border-green-500">
+            <div className="flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mr-3 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <p className="font-bold text-lg">{success}</p>
+                <p className="text-sm mt-1">Aguarde enquanto carregamos suas informações...</p>
+              </div>
+            </div>
           </div>
+        )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isLoading ? (
-              <Loader size="sm" text="Entrando..." />
-            ) : (
-              'Entrar'
-            )}
-          </button>
-        </form>
+        {isLoading ? (
+          <div className="flex flex-col justify-center items-center py-8">
+            <Loader text="Autenticando..." />
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-4">
+              Por favor, aguarde...
+            </p>
+          </div>
+        ) : (
+          <LoginForm onLogin={handleLogin} />
+        )}
 
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-400">
