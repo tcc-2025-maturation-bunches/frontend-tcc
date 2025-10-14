@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getAllResults, getResultByRequestId } from './resultQueryApi';
+import { getAllResults, getResultByRequestId, getResultsSummary } from './resultQueryApi';
 
 const requestHandlerClient = axios.create({
   baseURL: import.meta.env.VITE_REQUEST_HANDLER_API_URL,
@@ -180,12 +180,24 @@ export const getAllInferenceHistory = async (limit = 50, lastKey = null) => {
   }
 };
 
+export const getInferenceStatsSummary = async (days = 7) => {
+  try {
+    const response = await getResultsSummary(days);
+    return response;
+  } catch (error) {
+    console.error('Erro ao buscar estatísticas resumidas:', error);
+    throw error;
+  }
+};
+
 const safeParseFloat = (value, defaultValue = 0.0) => {
+  if (value === null || value === undefined || value === '') return defaultValue;
   const num = parseFloat(value);
   return isNaN(num) ? defaultValue : num;
 };
 
 const safeParseInt = (value, defaultValue = 0) => {
+  if (value === null || value === undefined || value === '') return defaultValue;
   const num = parseInt(value, 10);
   return isNaN(num) ? defaultValue : num;
 };
@@ -204,11 +216,19 @@ const transformBackendDataToFrontend = (backendData) => {
     const additionalMeta = item.additional_metadata || {};
 
     const maturationDist = procMetadata.maturation_distribution || {};
+    
+    const verde = safeParseInt(maturationDist.verde, 0);
+    const quaseMadura = safeParseInt(maturationDist.quase_madura, 0);
+    const madura = safeParseInt(maturationDist.madura, 0);
+    const muitoMadura = safeParseInt(maturationDist.muito_madura, 0);
+    const passada = safeParseInt(maturationDist.passada, 0);
+    const naoAnalisado = safeParseInt(maturationDist.nao_analisado, 0);
+    
     const maturationCounts = {
-      green: safeParseInt(maturationDist.verde, 0),
-      ripe: safeParseInt(maturationDist.madura, 0) + safeParseInt(maturationDist.quase_madura, 0),
-      overripe: safeParseInt(maturationDist.passada, 0) + safeParseInt(maturationDist.muito_madura, 0),
-      not_analyzed: safeParseInt(maturationDist.nao_analisado, 0),
+      green: verde,
+      ripe: quaseMadura + madura,
+      overripe: muitoMadura + passada,
+      not_analyzed: naoAnalisado,
     };
 
     const categoryMap = {
@@ -320,5 +340,6 @@ export default {
   getInferenceHistory,
   getAllInferenceHistory,
   getInferenceDetails,
+  getInferenceStatsSummary,
   startHistoryPolling,
 };

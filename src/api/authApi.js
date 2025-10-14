@@ -11,7 +11,7 @@ const authClient = axios.create({
 authClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('access_token');
-    if (token) {
+    if (token && config.url !== '/auth/login') {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -24,7 +24,7 @@ authClient.interceptors.request.use(
 authClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && error.config?.url !== '/auth/login') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user_data');
       window.location.href = '/';

@@ -11,11 +11,12 @@ import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
 import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
 import { getAllInferenceHistory, startHistoryPolling } from '../api/inferenceApi';
 import useAppConfig from '../hooks/useAppConfig';
+import { toast } from 'react-toastify';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { config: appConfig, isLoading: isConfigLoading } = useAppConfig();
-  const [activeTab, setActiveTab] = useState('analysis'); // 'analysis', 'statistics' ou 'devices'
+  const [activeTab, setActiveTab] = useState('analysis');
   const [inference, setInference] = useState(null);
   const [inferenceHistory, setInferenceHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -24,25 +25,29 @@ const Dashboard = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [apiError, setApiError] = useState(null);
   const [pollingEnabled, setPollingEnabled] = useState(false);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
 
   useEffect(() => {
-    if (!isConfigLoading) {
+    if (!isConfigLoading && user?.id && !hasInitialLoad) {
       loadInferenceHistory();
+      setHasInitialLoad(true);
     }
-  }, [isConfigLoading]);
+  }, [isConfigLoading, user, hasInitialLoad]);
 
   useEffect(() => {
     let stopPolling;
     
-    if (pollingEnabled) {
+    if (pollingEnabled && user?.id) {
       stopPolling = startHistoryPolling(user.id, (error, data) => {
         if (error) {
           console.error('Polling error:', error);
-          setApiError('Erro no carregamento automático de dados');
         } else if (data) {
           setInferenceHistory(data);
           if (data.length > 0) {
-            setInference(data[0]);
+            const sorted = [...data].sort((a, b) => 
+              new Date(b.processing_timestamp) - new Date(a.processing_timestamp)
+            );
+            setInference(sorted[0]);
           }
         }
       }, 60);
@@ -53,9 +58,16 @@ const Dashboard = () => {
         stopPolling();
       }
     };
-  }, [pollingEnabled, user.id]);
+  }, [pollingEnabled, user]);
 
   const loadInferenceHistory = async () => {
+    if (!user?.id) {
+      console.error('Usuário não possui ID válido');
+      setApiError('Erro: Dados do usuário incompletos');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       setApiError(null);
@@ -70,10 +82,21 @@ const Dashboard = () => {
           new Date(b.processing_timestamp) - new Date(a.processing_timestamp)
         );
         setInference(sorted[0]);
+      } else {
+        setInference(null);
       }
     } catch (error) {
       console.error('Error loading inference history:', error);
-      setApiError(`Erro ao carregar dados da API: ${error.message}`);
+      const errorMessage = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      setApiError(`Erro ao carregar dados: ${errorMessage}`);
+      
+      if (error.response?.status === 401) {
+        toast.error('Sessão expirada. Faça login novamente.');
+        setTimeout(() => logout(), 2000);
+      } else {
+        toast.error('Erro ao carregar histórico de análises');
+      }
+      
       setInferenceHistory([]);
       setInference(null);
     } finally {
@@ -96,10 +119,12 @@ const Dashboard = () => {
       setShowWebcamModal(true);
       return;
     }
+    
     if (!newInference || !newInference.image_id) {
       console.warn('Inferência inválida recebida:', newInference);
       return;
     }
+    
     const formattedInference = {
       ...newInference,
       image_id: newInference.image_id || newInference.request_id,
@@ -133,14 +158,25 @@ const Dashboard = () => {
     });
     
     setInference(formattedInference);
+    toast.success('Análise concluída com sucesso!');
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex items-center justify-center">
+        <Loader fullScreen text="Carregando dados do usuário..." />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white transition-colors duration-150">
       <header className="bg-white dark:bg-gray-800 shadow-md">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">Sistema de Análise de Bananas Nanicas</h1>
+            <h1 className="text-2xl font-bold text-green-600 dark:text-green-500">
+              Sistema de Análise de Bananas Nanicas
+            </h1>
             <div className="flex items-center space-x-4 mt-1">
               {appConfig && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -162,6 +198,12 @@ const Dashboard = () => {
             <div className="relative">
               <span className="text-gray-600 dark:text-gray-300">{user.name}</span>
             </div>
+            <button
+              onClick={logout}
+              className="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors"
+            >
+              Sair
+            </button>
           </div>
         </div>
       </header>
