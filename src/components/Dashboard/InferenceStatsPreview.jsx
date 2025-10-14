@@ -3,11 +3,13 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import Card from '../common/Card';
 import Loader from '../common/Loader';
 
-const COLORS = ['#22c55e', '#eab308', '#ef4444'];
+const COLORS = ['#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444'];
 const MATURATION_CATEGORIES = {
-    'green': { label: 'Verdes', color: '#22c55e' },
-    'ripe': { label: 'Maduras', color: '#eab308' },
-    'overripe': { label: 'Passadas', color: '#ef4444' }
+    'verde': { label: 'Verdes', color: '#22c55e' },
+    'quase_madura': { label: 'Quase Maduras', color: '#84cc16' },
+    'madura': { label: 'Maduras', color: '#eab308' },
+    'muito_madura': { label: 'Muito Maduras', color: '#f97316' },
+    'passada': { label: 'Passadas', color: '#ef4444' }
 };
 
 const InferenceStatsPreview = ({ data, isLoading, onViewDetails }) => {
@@ -15,9 +17,11 @@ const InferenceStatsPreview = ({ data, isLoading, onViewDetails }) => {
         if (!data || data.length === 0) return [];
 
         const counts = {
-            green: 0,
-            ripe: 0,
-            overripe: 0
+            verde: 0,
+            quase_madura: 0,
+            madura: 0,
+            muito_madura: 0,
+            passada: 0
         };
 
         data.forEach(inference => {

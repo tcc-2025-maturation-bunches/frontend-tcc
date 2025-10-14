@@ -32,12 +32,14 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
   };
 
   const getMaturationCounts = (results) => {
-    if (!results || !Array.isArray(results)) return { green: 0, ripe: 0, overripe: 0, total: 0 };
+    if (!results || !Array.isArray(results)) return { verde: 0, quase_madura: 0, madura: 0, muito_madura: 0, passada: 0, total: 0 };
     
     const counts = {
-      green: 0,
-      ripe: 0,
-      overripe: 0,
+      verde: 0,
+      quase_madura: 0,
+      madura: 0,
+      muito_madura: 0,
+      passada: 0,
       total: results.length
     };
     
@@ -224,10 +226,24 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.green}
+                                  {counts.verde}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.green / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.verde / counts.total) * 100).toFixed(1) : 0}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="w-3 h-3 bg-lime-500 rounded-full mr-3"></div>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Quase Maduras</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
+                                  {counts.quase_madura}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({counts.total ? ((counts.quase_madura / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>
@@ -238,10 +254,24 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.ripe}
+                                  {counts.madura}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.ripe / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.madura / counts.total) * 100).toFixed(1) : 0}%)
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Muito Maduras</span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
+                                  {counts.muito_madura}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({counts.total ? ((counts.muito_madura / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>
@@ -252,10 +282,10 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.overripe}
+                                  {counts.passada}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.overripe / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.passada / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>

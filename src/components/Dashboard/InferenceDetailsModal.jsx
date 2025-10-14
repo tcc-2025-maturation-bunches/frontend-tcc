@@ -30,14 +30,35 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
 
   const getCategoryColor = (category) => {
     switch (category?.toLowerCase()) {
-      case 'green':
+      case 'verde':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'ripe':
+      case 'quase_madura':
+        return 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200';
+      case 'madura':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'overripe':
+      case 'muito_madura':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'passada':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  const getCategoryLabel = (category) => {
+    switch (category?.toLowerCase()) {
+      case 'verde':
+        return 'Verde';
+      case 'quase_madura':
+        return 'Quase Madura';
+      case 'madura':
+        return 'Madura';
+      case 'muito_madura':
+        return 'Muito Madura';
+      case 'passada':
+        return 'Passada';
+      default:
+        return category;
     }
   };
 
@@ -111,26 +132,40 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
               <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Resumo da Análise</h3>
               <div className="space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="grid grid-cols-5 gap-2 text-center">
                     <div>
                       <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
                       <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                        {inference.summary?.maturation_counts?.green || 0}
+                        {inference.summary?.maturation_counts?.verde || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="w-4 h-4 bg-lime-500 rounded-full mx-auto mb-1"></div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Quase Mad.</span>
+                      <p className="text-lg font-semibold text-lime-600 dark:text-lime-400">
+                        {inference.summary?.maturation_counts?.quase_madura || 0}
                       </p>
                     </div>
                     <div>
                       <div className="w-4 h-4 bg-yellow-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
                       <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                        {inference.summary?.maturation_counts?.ripe || 0}
+                        {inference.summary?.maturation_counts?.madura || 0}
+                      </p>
+                    </div>
+                    <div>
+                      <div className="w-4 h-4 bg-orange-500 rounded-full mx-auto mb-1"></div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">Muito Mad.</span>
+                      <p className="text-lg font-semibold text-orange-600 dark:text-orange-400">
+                        {inference.summary?.maturation_counts?.muito_madura || 0}
                       </p>
                     </div>
                     <div>
                       <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-1"></div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
                       <p className="text-lg font-semibold text-red-600 dark:text-red-400">
-                        {inference.summary?.maturation_counts?.overripe || 0}
+                        {inference.summary?.maturation_counts?.passada || 0}
                       </p>
                     </div>
                   </div>
@@ -275,7 +310,7 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                           <div className="flex items-center">
                             <div className="w-16 bg-gray-200 rounded-full h-2 dark:bg-gray-700 mr-2">
                               <div 
-                                className="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" 
+                                className="bg-gradient-to-r from-green-500 to-red-500 h-2 rounded-full" 
                                 style={{ 
                                   width: `${result.maturation_level?.score 
                                     ? (result.maturation_level.score * 100) 
@@ -291,10 +326,7 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                         <td className="px-4 py-4 whitespace-nowrap text-sm">
                           {result.maturation_level?.category ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(result.maturation_level.category)}`}>
-                              {result.maturation_level.category === 'green' ? 'Verde' :
-                               result.maturation_level.category === 'ripe' ? 'Maduro' :
-                               result.maturation_level.category === 'overripe' ? 'Passado' :
-                               result.maturation_level.category}
+                              {getCategoryLabel(result.maturation_level.category)}
                             </span>
                           ) : (
                             <span className="text-gray-400">N/A</span>
