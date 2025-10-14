@@ -1,47 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import React, { useState } from 'react';
 import Button from '../common/Button';
 import Loader from '../common/Loader';
-import { getDeviceAnalytics, getDeviceHealth, deleteDevice } from '../../api/deviceMonitoringApi';
+import { deleteDevice, getLocationAnalytics } from '../../api/deviceMonitoringApi';
 
 const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
   const [activeTab, setActiveTab] = useState('info');
-  const [analytics, setAnalytics] = useState(null);
-  const [health, setHealth] = useState(null);
+  const [locationAnalytics, setLocationAnalytics] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
+  const loadLocationAnalytics = async () => {
+    if (!device.location) return;
+    
+    try {
+      setIsLoading(true);
+      const response = await getLocationAnalytics(device.location);
+      setLocationAnalytics(response);
+    } catch (error) {
+      console.error('Erro ao carregar analytics de localização:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
     if (activeTab === 'analytics') {
-      loadAnalytics();
-    } else if (activeTab === 'health') {
-      loadHealth();
+      loadLocationAnalytics();
     }
   }, [activeTab]);
-
-  const loadAnalytics = async () => {
-    try {
-      setIsLoading(true);
-      const response = await getDeviceAnalytics(device.device_id);
-      setAnalytics(response.analytics);
-    } catch (error) {
-      console.error('Erro ao carregar analytics:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadHealth = async () => {
-    try {
-      setIsLoading(true);
-      const response = await getDeviceHealth(device.device_id);
-      setHealth(response.health_report);
-    } catch (error) {
-      console.error('Erro ao carregar relatório de saúde:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleDelete = async () => {
     if (window.confirm(`Tem certeza que deseja remover o dispositivo ${device.device_name}?`)) {
@@ -64,25 +50,28 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
     return new Date(dateString).toLocaleString('pt-BR');
   };
 
-  const getHealthStatusColor = (status) => {
+  const getStatusColor = (status) => {
     switch (status) {
-      case 'excellent': return 'text-green-600 dark:text-green-400';
-      case 'good': return 'text-blue-600 dark:text-blue-400';
-      case 'fair': return 'text-yellow-600 dark:text-yellow-400';
-      case 'poor': return 'text-orange-600 dark:text-orange-400';
-      case 'critical': return 'text-red-600 dark:text-red-400';
-      default: return 'text-gray-600 dark:text-gray-400';
+      case 'online':
+        return 'text-green-600 dark:text-green-400';
+      case 'offline':
+        return 'text-red-600 dark:text-red-400';
+      case 'maintenance':
+        return 'text-yellow-600 dark:text-yellow-400';
+      case 'error':
+        return 'text-orange-600 dark:text-orange-400';
+      default:
+        return 'text-gray-600 dark:text-gray-400';
     }
   };
 
-  const getHealthStatusLabel = (status) => {
+  const getStatusLabel = (status) => {
     switch (status) {
-      case 'excellent': return 'Excelente';
-      case 'good': return 'Bom';
-      case 'fair': return 'Regular';
-      case 'poor': return 'Ruim';
-      case 'critical': return 'Crítico';
-      default: return 'Desconhecido';
+      case 'online': return 'Online';
+      case 'offline': return 'Offline';
+      case 'maintenance': return 'Manutenção';
+      case 'error': return 'Erro';
+      default: return status;
     }
   };
 
@@ -103,7 +92,6 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
           </button>
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b border-gray-200 dark:border-gray-700">
           <button
             className={`px-6 py-3 font-medium text-sm ${
@@ -124,16 +112,6 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
             onClick={() => setActiveTab('analytics')}
           >
             Analytics
-          </button>
-          <button
-            className={`px-6 py-3 font-medium text-sm ${
-              activeTab === 'health'
-                ? 'text-green-600 dark:text-green-400 border-b-2 border-green-600 dark:border-green-400'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-            }`}
-            onClick={() => setActiveTab('health')}
-          >
-            Saúde
           </button>
         </div>
 
@@ -166,14 +144,8 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                       <dt className="text-sm text-gray-500 dark:text-gray-400">Status:</dt>
-                      <dd className="text-sm font-medium">
-                        {device.status === 'online' ? (
-                          <span className="text-green-600 dark:text-green-400">Online</span>
-                        ) : device.status === 'offline' ? (
-                          <span className="text-red-600 dark:text-red-400">Offline</span>
-                        ) : (
-                          <span className="text-yellow-600 dark:text-yellow-400">{device.status}</span>
-                        )}
+                      <dd className={`text-sm font-medium ${getStatusColor(device.status)}`}>
+                        {getStatusLabel(device.status)}
                       </dd>
                     </div>
                     <div className="flex justify-between py-2">
@@ -226,6 +198,40 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
 
               <div>
                 <h3 className="text-lg font-medium mb-4 text-gray-700 dark:text-gray-300">
+                  Capacidades
+                </h3>
+                <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                  <dl className="grid grid-cols-2 gap-4">
+                    <div>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Resolução da Câmera:</dt>
+                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {device.capabilities?.camera_resolution || 'N/A'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Plataforma:</dt>
+                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {device.capabilities?.platform || 'N/A'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Captura Automática:</dt>
+                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {device.capabilities?.auto_capture ? 'Sim' : 'Não'}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm text-gray-500 dark:text-gray-400">Armazenamento Local:</dt>
+                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {device.capabilities?.local_storage ? 'Sim' : 'Não'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-medium mb-4 text-gray-700 dark:text-gray-300">
                   Datas do Sistema
                 </h3>
                 <dl className="space-y-3">
@@ -252,120 +258,26 @@ const DeviceDetailsModal = ({ device, onClose, onUpdate }) => {
                 <div className="flex justify-center items-center h-64">
                   <Loader text="Carregando analytics..." />
                 </div>
-              ) : analytics ? (
+              ) : locationAnalytics ? (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Período</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {analytics.period_days} dias
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Taxa de Sucesso</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {analytics.success_rate?.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">Uptime</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {analytics.uptime_percentage?.toFixed(1)}%
-                      </p>
-                    </div>
+                  <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                    <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">
+                      Analytics da Localização: {device.location}
+                    </h3>
+                    <pre className="text-sm text-gray-700 dark:text-gray-300 overflow-auto">
+                      {JSON.stringify(locationAnalytics, null, 2)}
+                    </pre>
                   </div>
-
-                  {analytics.captures_by_day && analytics.captures_by_day.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-medium mb-4 text-gray-700 dark:text-gray-300">
-                        Capturas por Dia
-                      </h3>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={analytics.captures_by_day}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Line type="monotone" dataKey="captures" stroke="#22c55e" />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  Não há dados de analytics disponíveis
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'health' && (
-            <div>
-              {isLoading ? (
-                <div className="flex justify-center items-center h-64">
-                  <Loader text="Carregando relatório de saúde..." />
-                </div>
-              ) : health ? (
-                <div className="space-y-6">
-                  <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300">
-                        Status de Saúde
-                      </h3>
-                      <div className={`text-2xl font-bold ${getHealthStatusColor(health.health_status)}`}>
-                        {health.health_score?.toFixed(0)}/100
-                      </div>
-                    </div>
-                    <p className={`text-lg font-medium ${getHealthStatusColor(health.health_status)}`}>
-                      {getHealthStatusLabel(health.health_status)}
-                    </p>
-                  </div>
-
-                  {health.recommendations && health.recommendations.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-medium mb-4 text-gray-700 dark:text-gray-300">
-                        Recomendações
-                      </h3>
-                      <ul className="space-y-2">
-                        {health.recommendations.map((rec, index) => (
-                          <li key={index} className="flex items-start">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500 mr-2 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {health.next_maintenance && (
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                        Próxima Manutenção Recomendada
-                      </p>
-                      <p className="text-lg font-semibold text-yellow-900 dark:text-yellow-100">
-                        {health.next_maintenance === 'imediata' ? 'Imediata' :
-                         health.next_maintenance === '7_dias' ? 'Em 7 dias' :
-                         health.next_maintenance === '30_dias' ? 'Em 30 dias' :
-                         'Em 90 dias'}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  Não há dados de saúde disponíveis
+                  Não há dados de analytics disponíveis para esta localização
                 </div>
               )}
             </div>
           )}
         </div>
-
+        
         <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-between">
           <Button
             variant="danger"

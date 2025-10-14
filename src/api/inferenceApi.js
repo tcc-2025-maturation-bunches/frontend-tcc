@@ -1,19 +1,79 @@
-import apiClient from './apiClient';
+import axios from 'axios';
+import { getAllResults, getResultByRequestId } from './resultQueryApi';
+
+const requestHandlerClient = axios.create({
+  baseURL: import.meta.env.VITE_REQUEST_HANDLER_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 30000,
+});
+
+requestHandlerClient.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+requestHandlerClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user_data');
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
 
 const endpoints = {
   presignedUrl: '/storage/presigned-url',
+  presignedResultUrl: '/storage/presigned-result-url',
+  batchPresignedUrls: '/storage/batch-presigned-urls',
+  validateFile: '/storage/validate/',
   combinedProcess: '/combined/process',
   combinedStatus: '/combined/status/',
-  getCombinedResultByRequest: '/combined/results/request/', 
-  getHistoryByUser: '/combined/results?user_id=',
-  getAllHistory: '/combined/results?exclude_errors=true',
+  userRequests: '/combined/user/',
+  batchProcess: '/combined/batch-process',
+  queueStats: '/combined/queue/stats',
 };
 
 export const getPresignedUrl = async (filename, contentType, userId) => {
-  const response = await apiClient.post(endpoints.presignedUrl, {
+  const response = await requestHandlerClient.post(endpoints.presignedUrl, {
     filename,
     content_type: contentType,
     user_id: userId,
+  });
+  return response.data;
+};
+
+export const getPresignedResultUrl = async (filename, contentType, userId) => {
+  const response = await requestHandlerClient.post(endpoints.presignedResultUrl, {
+    filename,
+    content_type: contentType,
+    user_id: userId,
+  });
+  return response.data;
+};
+
+export const getBatchPresignedUrls = async (requests) => {
+  const response = await requestHandlerClient.post(endpoints.batchPresignedUrls, {
+    requests
+  });
+  return response.data;
+};
+
+export const validateFileExists = async (key, bucket = 'images') => {
+  const response = await requestHandlerClient.get(`${endpoints.validateFile}${key}`, {
+    params: { bucket }
   });
   return response.data;
 };
@@ -34,7 +94,7 @@ export const uploadImageToS3 = async (presignedUrl, file, contentType) => {
   return response;
 };
 
-export const processImageCombined = async (imageUrl, metadata) => {
+export const processImageCombined = async (imageUrl, metadata, resultUploadUrl = null) => {
   const requiredFields = ['user_id', 'image_id', 'location'];
   const missingFields = requiredFields.filter(field => !metadata[field]);
   
@@ -45,28 +105,52 @@ export const processImageCombined = async (imageUrl, metadata) => {
   const requestBody = {
     image_url: imageUrl,
     metadata: metadata,
-    result_upload_url: metadata.result_upload_url || null
+    result_upload_url: resultUploadUrl
   };
 
-  const response = await apiClient.post(endpoints.combinedProcess, requestBody);
+  const response = await requestHandlerClient.post(endpoints.combinedProcess, requestBody);
+  return response.data;
+};
+
+export const batchProcessImages = async (requests) => {
+  const response = await requestHandlerClient.post(endpoints.batchProcess, requests);
   return response.data;
 };
 
 export const getProcessingStatus = async (requestId) => {
-  const response = await apiClient.get(`${endpoints.combinedStatus}${requestId}`);
+  const response = await requestHandlerClient.get(`${endpoints.combinedStatus}${requestId}`);
+  return response.data;
+};
+
+export const getUserRequests = async (userId, limit = 10, statusFilter = null) => {
+  const params = { limit };
+  if (statusFilter) params.status_filter = statusFilter;
+  
+  const response = await requestHandlerClient.get(`${endpoints.userRequests}${userId}/requests`, {
+    params
+  });
+  return response.data;
+};
+
+export const getQueueStats = async () => {
+  const response = await requestHandlerClient.get(endpoints.queueStats);
   return response.data;
 };
 
 export const getProcessingResults = async (requestId) => {
-  const response = await apiClient.get(`${endpoints.getCombinedResultByRequest}${requestId}`);
-  const transformedData = transformBackendDataToFrontend([response.data]);
-  return transformedData[0]; 
+  const response = await getResultByRequestId(requestId);
+  const transformedData = transformBackendDataToFrontend([response]);
+  return transformedData[0];
 };
 
 export const getInferenceHistory = async (userId, limit = 100) => {
   try {
-    const response = await apiClient.get(`${endpoints.getHistoryByUser}${userId}&limit=${limit}`);
-    const items = response.data.items || response.data || [];
+    const response = await getAllResults({
+      userId,
+      limit,
+      excludeErrors: true
+    });
+    const items = response.items || [];
     return transformBackendDataToFrontend(items);
   } catch (error) {
     console.error('Erro ao buscar histórico do usuário:', error);
@@ -76,25 +160,19 @@ export const getInferenceHistory = async (userId, limit = 100) => {
 
 export const getAllInferenceHistory = async (limit = 50, lastKey = null) => {
   try {
-    const params = new URLSearchParams({
-      exclude_errors: 'true',
-      limit: limit.toString(),
+    const response = await getAllResults({
+      limit,
+      pageToken: lastKey,
+      excludeErrors: true
     });
 
-    if (lastKey) {
-      params.append('last_key', lastKey);
-    }
-    
-    const response = await apiClient.get(`/combined/results?${params.toString()}`);
-    const backendData = response.data;
-
-    const transformedData = transformBackendDataToFrontend(backendData.items || []);
+    const transformedData = transformBackendDataToFrontend(response.items || []);
 
     return {
       items: transformedData,
-      nextKey: backendData.next_page_token || null,
-      hasMore: backendData.has_more || false,
-      totalCount: backendData.total_count || 0,
+      nextKey: response.next_page_token || null,
+      hasMore: response.has_more || false,
+      totalCount: response.total_count || 0,
     };
   } catch (error) {
     console.error('Erro ao buscar histórico geral:', error);
@@ -103,13 +181,13 @@ export const getAllInferenceHistory = async (limit = 50, lastKey = null) => {
 };
 
 const safeParseFloat = (value, defaultValue = 0.0) => {
-    const num = parseFloat(value);
-    return isNaN(num) ? defaultValue : num;
+  const num = parseFloat(value);
+  return isNaN(num) ? defaultValue : num;
 };
 
 const safeParseInt = (value, defaultValue = 0) => {
-    const num = parseInt(value, 10);
-    return isNaN(num) ? defaultValue : num;
+  const num = parseInt(value, 10);
+  return isNaN(num) ? defaultValue : num;
 };
 
 const transformBackendDataToFrontend = (backendData) => {
@@ -118,7 +196,7 @@ const transformBackendDataToFrontend = (backendData) => {
   }
 
   return backendData.map(item => {
-    const detection = item.detection || {};
+    const detection = item.detection_results || item.detection_result || item.detection || {};
     const results = detection.results || [];
     const summary = detection.summary || {};
     const procMetadata = item.processing_metadata || {};
@@ -128,14 +206,16 @@ const transformBackendDataToFrontend = (backendData) => {
     const maturationDist = procMetadata.maturation_distribution || {};
     const maturationCounts = {
       green: safeParseInt(maturationDist.verde, 0),
-      ripe: safeParseInt(maturationDist.madura, 0),
-      overripe: safeParseInt(maturationDist.passada, 0),
+      ripe: safeParseInt(maturationDist.madura, 0) + safeParseInt(maturationDist.quase_madura, 0),
+      overripe: safeParseInt(maturationDist.passada, 0) + safeParseInt(maturationDist.muito_madura, 0),
       not_analyzed: safeParseInt(maturationDist.nao_analisado, 0),
     };
 
     const categoryMap = {
       'verde': 'green',
+      'quase_madura': 'ripe',
       'madura': 'ripe', 
+      'muito_madura': 'overripe',
       'passada': 'overripe'
     };
     
@@ -143,8 +223,9 @@ const transformBackendDataToFrontend = (backendData) => {
       image_id: item.image_id || item.request_id,
       request_id: item.request_id,
       user_id: item.user_id,
-      processing_timestamp: item.createdAt || item.updatedAt || new Date().toISOString(),
-      location: initialMetadata.location || 'N/A',
+      device_id: item.device_id,
+      processing_timestamp: item.created_at || item.updated_at || new Date().toISOString(),
+      location: initialMetadata.location || additionalMeta.location || 'N/A',
       status: item.status === 'success' ? 'completed' : (item.status || 'completed'),
       image_url: item.image_url,
       image_result_url: item.image_result_url,
@@ -154,9 +235,10 @@ const transformBackendDataToFrontend = (backendData) => {
         confidence: safeParseFloat(r.confidence),
         bounding_box: (r.bounding_box || []).map(b => safeParseFloat(b)),
         maturation_level: r.maturation_level ? {
-            category: categoryMap[r.maturation_level.category] || r.maturation_level.category,
-            score: safeParseFloat(r.maturation_level.score),
-            original_category: r.maturation_level.category, // Manter original para debug
+          category: categoryMap[r.maturation_level.category] || r.maturation_level.category,
+          score: safeParseFloat(r.maturation_level.score),
+          original_category: r.maturation_level.category,
+          estimated_days_until_spoilage: r.maturation_level.estimated_days_until_spoilage
         } : null
       })),
       summary: {
@@ -171,18 +253,19 @@ const transformBackendDataToFrontend = (backendData) => {
         model_versions: summary.model_versions || {},
       },
       metadata: {
-        source: additionalMeta.source || 'unknown',
-        timestamp: additionalMeta.timestamp,
+        source: additionalMeta.source || (item.device_id ? 'monitoring' : 'webcam'),
+        timestamp: additionalMeta.timestamp || additionalMeta.capture_timestamp,
+        device_id: item.device_id,
         device_info: additionalMeta.device_info,
         image_dimensions: procMetadata.image_dimensions,
         environmental: additionalMeta.environmental || {},
         camera_settings: additionalMeta.camera_settings || {},
       },
       backend_data: {
-          detection: item.detection,
-          processing_metadata: procMetadata,
-          initial_metadata: initialMetadata,
-          additional_metadata: additionalMeta,
+        detection: detection,
+        processing_metadata: procMetadata,
+        initial_metadata: initialMetadata,
+        additional_metadata: additionalMeta,
       }
     };
   });
@@ -209,4 +292,33 @@ export const startHistoryPolling = (userId, callback, intervalSeconds = 30) => {
   const intervalId = setInterval(pollHistory, intervalSeconds * 1000);
   
   return () => clearInterval(intervalId);
+};
+
+export const getInferenceDetails = async (requestId) => {
+  try {
+    const response = await getResultByRequestId(requestId);
+    const transformedData = transformBackendDataToFrontend([response]);
+    return transformedData[0];
+  } catch (error) {
+    console.error('Erro ao buscar detalhes da inferência:', error);
+    throw error;
+  }
+};
+
+export default {
+  getPresignedUrl,
+  getPresignedResultUrl,
+  getBatchPresignedUrls,
+  validateFileExists,
+  uploadImageToS3,
+  processImageCombined,
+  batchProcessImages,
+  getProcessingStatus,
+  getUserRequests,
+  getQueueStats,
+  getProcessingResults,
+  getInferenceHistory,
+  getAllInferenceHistory,
+  getInferenceDetails,
+  startHistoryPolling,
 };

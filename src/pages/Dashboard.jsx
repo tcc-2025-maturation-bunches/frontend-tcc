@@ -45,7 +45,7 @@ const Dashboard = () => {
             setInference(data[0]);
           }
         }
-      }, 30);
+      }, 60);
     }
 
     return () => {
@@ -253,7 +253,7 @@ const Dashboard = () => {
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Auto-atualizar (30s)
+                  Atualizar automaticamente (60s)
                 </span>
               </label>
             </div>
@@ -302,7 +302,7 @@ const Dashboard = () => {
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
                 <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                  Auto-atualizar (30s)
+                  Atualizar automaticamente (60s)
                 </span>
               </label>
               
