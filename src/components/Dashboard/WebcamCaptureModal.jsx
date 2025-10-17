@@ -59,11 +59,8 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
     capturedImage,
     isUploading,
     uploadError,
-    uploadedImageUrl,
-    uploadedImageId,
     requestCameraAccess,
     captureImage,
-    resetImage,
     uploadImage
   } = useWebcamCapture();
 

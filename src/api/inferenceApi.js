@@ -233,13 +233,16 @@ const transformBackendDataToFrontend = (backendData) => {
       nao_analisado: naoAnalisado,
     };
     
+    // Fallback para initial_metadata ou additional_metadata (formatos antigos)
+    const location = item.location || initialMetadata.location || additionalMeta.location || 'N/A';
+    
     return {
       image_id: item.image_id || item.request_id,
       request_id: item.request_id,
       user_id: item.user_id,
       device_id: item.device_id,
       processing_timestamp: item.created_at || item.updated_at || new Date().toISOString(),
-      location: initialMetadata.location || additionalMeta.location || 'N/A',
+      location: location,
       status: item.status === 'success' ? 'completed' : (item.status || 'completed'),
       image_url: item.image_url,
       image_result_url: item.image_result_url,

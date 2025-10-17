@@ -109,9 +109,9 @@ const DeviceDetailsModal = ({ device: initialDevice, onClose, onUpdate }) => {
     const failedCaptures = parseStatsValue(device.stats?.failed_captures);
     
     return [
-      { name: 'Bem-sucedidas', value: successfulCaptures, color: '#22c55e' },
-      { name: 'Falhadas', value: failedCaptures, color: '#ef4444' },
-      { name: 'Pendentes', value: Math.max(0, totalCaptures - successfulCaptures - failedCaptures), color: '#f59e0b' }
+      { name: 'Bem-sucedidas', value: successfulCaptures, color: COLORS[0] },
+      { name: 'Falhadas', value: failedCaptures, color: COLORS[1] },
+      { name: 'Pendentes', value: Math.max(0, totalCaptures - successfulCaptures - failedCaptures), color: COLORS[2] }
     ].filter(item => item.value > 0);
   };
 
