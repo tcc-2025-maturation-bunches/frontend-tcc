@@ -31,24 +31,45 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
     return timeMs >= 1000 ? `${(timeMs / 1000).toFixed(2)}s` : `${timeMs}ms`;
   };
 
-  const getMaturationCounts = (results) => {
-    if (!results || !Array.isArray(results)) return { verde: 0, quase_madura: 0, madura: 0, muito_madura: 0, passada: 0, total: 0 };
+  const getMaturationCounts = (maturationDistribution, results) => {
+    if (maturationDistribution) {
+      return {
+        verde: parseInt(maturationDistribution.verde || 0),
+        quase_maduro: parseInt(maturationDistribution.quase_maduro || 0),
+        maduro: parseInt(maturationDistribution.maduro || 0),
+        muito_maduro_ou_passado: parseInt(maturationDistribution.muito_maduro_ou_passado || 0),
+        nao_analisado: parseInt(maturationDistribution.nao_analisado || 0),
+        total: results?.length || 0
+      };
+    }
+    
+    if (!results || !Array.isArray(results)) {
+      return { verde: 0, quase_maduro: 0, maduro: 0, muito_maduro_ou_passado: 0, nao_analisado: 0, total: 0 };
+    }
     
     const counts = {
       verde: 0,
-      quase_madura: 0,
-      madura: 0,
-      muito_madura: 0,
-      passada: 0,
+      quase_maduro: 0,
+      maduro: 0,
+      muito_maduro_ou_passado: 0,
+      nao_analisado: 0,
       total: results.length
     };
     
     results.forEach(result => {
       if (result.maturation_level && result.maturation_level.category) {
         const category = result.maturation_level.category.toLowerCase();
-        if (counts[category] !== undefined) {
+        if (category === 'muito_maduro_ou_passado') {
+          counts.muito_maduro_ou_passado++;
+        } else if (category === 'quase_maduro') {
+          counts.quase_maduro++;
+        } else if (category === 'maduro') {
+          counts.maduro++;
+        } else if (counts[category] !== undefined) {
           counts[category]++;
         }
+      } else {
+        counts.nao_analisado++;
       }
     });
     
@@ -58,8 +79,8 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
   const handleViewDetails = async () => {
     try {
       if (inference.request_id) {
-        const { getInferenceDetails } = await import('../../api/inferenceApi');
-        const detailedInference = await getInferenceDetails(inference.request_id);
+        const { getResultByRequestId } = await import('../../api/resultQueryApi');
+        const detailedInference = await getResultByRequestId(inference.request_id);
         onViewDetails(detailedInference);
       } else {
         onViewDetails(inference);
@@ -73,10 +94,12 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
+      case 'success':
         return 'text-green-600 dark:text-green-400';
       case 'processing':
         return 'text-yellow-600 dark:text-yellow-400';
       case 'error':
+      case 'failed':
         return 'text-red-600 dark:text-red-400';
       default:
         return 'text-gray-600 dark:text-gray-400';
@@ -129,16 +152,6 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                       e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Análise';
                     }}
                   />
-                ) : inference.detection?.image_result_url ? (
-                  <img
-                    src={inference.detection.image_result_url}
-                    alt="Resultado da detecção"
-                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Detecção';
-                    }}
-                  />
                 ) : (
                   <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
                     <div className="text-center">
@@ -164,40 +177,63 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                   <dl className="grid grid-cols-1 gap-3 text-sm">
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Data/Hora:</dt>
-                      <dd className="text-gray-900 dark:text-gray-200">{formatDate(inference.processing_timestamp)}</dd>
+                      <dd className="text-gray-900 dark:text-gray-200">
+                        {formatDate(inference.created_at || inference.processing_timestamp)}
+                      </dd>
                     </div>
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Local:</dt>
-                      <dd className="text-gray-900 dark:text-gray-200">{inference.location || 'N/A'}</dd>
+                      <dd className="text-gray-900 dark:text-gray-200">
+                        {inference.initial_metadata?.location || inference.location || 'N/A'}
+                      </dd>
                     </div>
+                    {inference.device_id && (
+                      <div className="flex justify-between items-center">
+                        <dt className="text-gray-500 dark:text-gray-400 font-medium">Dispositivo:</dt>
+                        <dd className="text-gray-900 dark:text-gray-200">{inference.device_id}</dd>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Status:</dt>
                       <dd className={`font-semibold ${getStatusColor(inference.status)}`}>
-                        {inference.status === 'completed' ? 'Concluído' : 
+                        {inference.status === 'completed' || inference.status === 'success' ? 'Concluído' : 
                          inference.status === 'processing' ? 'Processando' : 
-                         inference.status === 'error' ? 'Erro' : inference.status}
+                         inference.status === 'error' || inference.status === 'failed' ? 'Erro' : inference.status}
                       </dd>
                     </div>
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Total de Objetos:</dt>
-                      <dd className="text-gray-900 dark:text-gray-200 font-semibold">{inference.summary?.total_objects || 0}</dd>
+                      <dd className="text-gray-900 dark:text-gray-200 font-semibold">
+                        {inference.detection_result?.summary?.total_objects || 
+                         inference.summary?.total_objects || 0}
+                      </dd>
                     </div>
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Maturação Média:</dt>
                       <dd className="text-gray-900 dark:text-gray-200 font-semibold">
-                        {formatMaturationScore(inference.summary?.average_maturation_score)}
+                        {formatMaturationScore(
+                          inference.detection_result?.summary?.average_maturation_score || 
+                          inference.summary?.average_maturation_score
+                        )}
                       </dd>
                     </div>
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Confiança Média:</dt>
                       <dd className="text-gray-900 dark:text-gray-200 font-semibold">
-                        {formatConfidence(inference.summary?.average_confidence)}
+                        {formatConfidence(
+                          inference.detection_result?.results?.length > 0 
+                            ? inference.detection_result.results.reduce((sum, r) => sum + parseFloat(r.confidence || 0), 0) / inference.detection_result.results.length
+                            : inference.summary?.average_confidence
+                        )}
                       </dd>
                     </div>
                     <div className="flex justify-between items-center">
                       <dt className="text-gray-500 dark:text-gray-400 font-medium">Tempo de Processamento:</dt>
                       <dd className="text-gray-900 dark:text-gray-200 font-semibold">
-                        {formatProcessingTime(inference.summary?.total_processing_time_ms)}
+                        {formatProcessingTime(
+                          inference.processing_time_ms || 
+                          inference.summary?.total_processing_time_ms
+                        )}
                       </dd>
                     </div>
                   </dl>
@@ -213,16 +249,19 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                   Distribuição de Maturação
                 </h3>
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mt-2">
-                  {inference.results && inference.results.length > 0 ? (
+                  {inference.detection_result?.results && inference.detection_result.results.length > 0 ? (
                     <div className="space-y-3">
                       {(() => {
-                        const counts = getMaturationCounts(inference.results);
+                        const counts = getMaturationCounts(
+                          inference.processing_metadata?.maturation_distribution,
+                          inference.detection_result?.results
+                        );
                         return (
                           <>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Verdes</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Verde</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
@@ -236,59 +275,61 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="w-3 h-3 bg-lime-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Quase Maduras</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Quase Maduro</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.quase_madura}
+                                  {counts.quase_maduro}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.quase_madura / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.quase_maduro / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="w-3 h-3 bg-yellow-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Maduras</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Maduro</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.madura}
+                                  {counts.maduro}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.madura / counts.total) * 100).toFixed(1) : 0}%)
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center">
-                                <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Muito Maduras</span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.muito_madura}
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.muito_madura / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.maduro / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center">
                                 <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Passadas</span>
+                                <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Muito Maduro ou Passado</span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
-                                  {counts.passada}
+                                  {counts.muito_maduro_ou_passado}
                                 </span>
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({counts.total ? ((counts.passada / counts.total) * 100).toFixed(1) : 0}%)
+                                  ({counts.total ? ((counts.muito_maduro_ou_passado / counts.total) * 100).toFixed(1) : 0}%)
                                 </span>
                               </div>
                             </div>
+                            {counts.nao_analisado > 0 && (
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                  <div className="w-3 h-3 bg-gray-400 rounded-full mr-3"></div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-400 font-medium">Não Analisado</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-200">
+                                    {counts.nao_analisado}
+                                  </span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    ({counts.total ? ((counts.nao_analisado / counts.total) * 100).toFixed(1) : 0}%)
+                                  </span>
+                                </div>
+                              </div>
+                            )}
                             
                             <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
                               <div className="flex items-center justify-between text-sm">

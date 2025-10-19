@@ -41,6 +41,7 @@ const endpoints = {
   allResults: '/results/all',
   resultsSummary: '/results/summary',
   userStats: '/results/stats/user/',
+  inferenceStats: '/results/stats/inference',
   healthCheck: '/health/',
   healthDetailed: '/health/detailed',
   healthReady: '/health/ready',
@@ -60,22 +61,22 @@ export const getResultsByImageId = async (imageId) => {
 
 export const getResultsByUserId = async (userId, limit = 20) => {
   const response = await resultQueryClient.get(`${endpoints.resultsByUser}${userId}`, {
-    params: { limit }
+    params: { page_size: limit }
   });
   return response.data;
 };
 
 export const getResultsByDeviceId = async (deviceId, limit = 20) => {
   const response = await resultQueryClient.get(`${endpoints.resultsByDevice}${deviceId}`, {
-    params: { limit }
+    params: { page_size: limit }
   });
   return response.data;
 };
 
 export const getAllResults = async (params = {}) => {
   const {
-    limit = 20,
-    pageToken = null,
+    page = 1,
+    pageSize = 20,
     statusFilter = null,
     userId = null,
     deviceId = null,
@@ -83,11 +84,11 @@ export const getAllResults = async (params = {}) => {
   } = params;
 
   const queryParams = {
-    limit,
+    page,
+    page_size: pageSize,
     exclude_errors: excludeErrors
   };
 
-  if (pageToken) queryParams.page_token = pageToken;
   if (statusFilter) queryParams.status_filter = statusFilter;
   if (userId) queryParams.user_id = userId;
   if (deviceId) queryParams.device_id = deviceId;
@@ -103,6 +104,13 @@ export const getResultsSummary = async (days = 7, deviceId = null) => {
   if (deviceId) params.device_id = deviceId;
 
   const response = await resultQueryClient.get(endpoints.resultsSummary, { params });
+  return response.data;
+};
+
+export const getInferenceStats = async (days = 7) => {
+  const response = await resultQueryClient.get(endpoints.inferenceStats, {
+    params: { days }
+  });
   return response.data;
 };
 
@@ -145,6 +153,7 @@ export default {
   getResultsByDeviceId,
   getAllResults,
   getResultsSummary,
+  getInferenceStats,
   getUserStats,
   healthCheck,
   healthCheckDetailed,
