@@ -108,7 +108,7 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
     <>
       <Card
         title="Histórico de Análises"
-        subtitle={`${sortedData.length} análises encontradas`}
+        subtitle={`Veja as últimas análises realizadas (${data ? data.length : 0} registros)`}
         className="h-full"
         bodyClassName="p-0"
       >
