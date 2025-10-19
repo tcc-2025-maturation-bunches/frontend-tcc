@@ -14,7 +14,7 @@ const ThemeToggle = ({ className = '' }) => {
       <svg
         xmlns="http://www.w3.org/2000/svg"
         className={`h-6 w-6 transition-all ${
-          isDark ? 'text-gray-400 scale-100' : 'text-yellow-500 scale-100'
+          isDark ? 'opacity-0 scale-0' : 'text-yellow-500 opacity-100 scale-100'
         }`}
         fill="none"
         viewBox="0 0 24 24"
@@ -32,7 +32,7 @@ const ThemeToggle = ({ className = '' }) => {
       <svg
         xmlns="http://www.w3.org/2000/svg"
         className={`absolute h-6 w-6 transition-all ${
-          isDark ? 'text-blue-300 opacity-100' : 'opacity-0'
+          isDark ? 'text-blue-300 opacity-100 scale-100' : 'opacity-0 scale-0'
         }`}
         fill="none"
         viewBox="0 0 24 24"

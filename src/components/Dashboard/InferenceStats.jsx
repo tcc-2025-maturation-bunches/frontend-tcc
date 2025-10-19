@@ -152,10 +152,10 @@ const InferenceStats = ({ statsApiData, isLoading }) => {
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: 14 }} />
-                  <Line type="monotone" dataKey="verde" stroke={MATURATION_CATEGORIES.Verdes.color} name={MATURATION_CATEGORIES.Verdes.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="quase_maduro" stroke={MATURATION_CATEGORIES['Quase Maduros'].color} name={MATURATION_CATEGORIES['Quase Maduros'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="maduro" stroke={MATURATION_CATEGORIES.Maduros.color} name={MATURATION_CATEGORIES.Maduros.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="monotone" dataKey="muito_maduro_ou_passado" stroke={MATURATION_CATEGORIES['Muito Maduros ou Passados'].color} name={MATURATION_CATEGORIES['Muito Maduros ou Passados'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="verde" stroke={MATURATION_CATEGORIES.Verdes.color} name={MATURATION_CATEGORIES.Verdes.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="quase_maduro" stroke={MATURATION_CATEGORIES['Quase Maduros'].color} name={MATURATION_CATEGORIES['Quase Maduros'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="maduro" stroke={MATURATION_CATEGORIES.Maduros.color} name={MATURATION_CATEGORIES.Maduros.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="muito_maduro_ou_passado" stroke={MATURATION_CATEGORIES['Muito Maduros ou Passados'].color} name={MATURATION_CATEGORIES['Muito Maduros ou Passados'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
