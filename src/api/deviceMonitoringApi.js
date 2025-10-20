@@ -34,7 +34,7 @@ deviceClient.interceptors.response.use(
 );
 
 export const listDevices = async (filters = {}) => {
-  const { status_filter, location_filter, limit = 50 } = filters;
+  const { status_filter, location_filter, limit = 100 } = filters;
   const params = { limit };
   
   if (status_filter) params.status_filter = status_filter;
@@ -170,7 +170,14 @@ export const getDashboardData = async () => {
 
     const totalCaptures = devicesList.reduce((sum, d) => sum + (d.stats?.total_captures || 0), 0);
     const successfulCaptures = devicesList.reduce((sum, d) => sum + (d.stats?.successful_captures || 0), 0);
-    const averageSuccessRate = totalCaptures > 0 ? (successfulCaptures / totalCaptures) * 100 : 0;
+    
+    const devicesWithCaptures = devicesList.filter(d => (d.stats?.total_captures || 0) > 0);
+    const averageSuccessRate = devicesWithCaptures.length > 0
+      ? devicesWithCaptures.reduce((sum, d) => {
+          const deviceRate = (d.stats.successful_captures || 0) / d.stats.total_captures * 100;
+          return sum + deviceRate;
+        }, 0) / devicesWithCaptures.length
+      : 0;
 
     return {
       data: {
@@ -182,7 +189,8 @@ export const getDashboardData = async () => {
         devices_by_location: stats.devices_by_location || {},
         recent_registrations: stats.recent_registrations || [],
         average_success_rate: averageSuccessRate,
-      }
+      },
+      devices: devicesList
     };
   } catch (error) {
     console.error('Error getting dashboard data:', error);
@@ -200,7 +208,6 @@ export const startDashboardPolling = (callback, intervalSeconds = 30) => {
     }
   };
 
-  pollDashboard();
   const intervalId = setInterval(pollDashboard, intervalSeconds * 1000);
   return () => clearInterval(intervalId);
 };

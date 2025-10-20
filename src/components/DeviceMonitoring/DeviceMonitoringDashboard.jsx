@@ -5,8 +5,7 @@ import Loader from '../common/Loader';
 import { 
   getDashboardData, 
   listDevices,
-  checkOfflineDevices,
-  startDashboardPolling 
+  checkOfflineDevices
 } from '../../api/deviceMonitoringApi';
 import DeviceList from './DeviceList';
 import DeviceDetailsModal from './DeviceDetailsModal';
@@ -25,37 +24,33 @@ const DeviceMonitoringDashboard = () => {
 
   useEffect(() => {
     loadDashboardData();
-    loadDevices();
-
-    const stopPolling = startDashboardPolling((error, data) => {
-      if (!error && data) {
-        setDashboardData(data.data);
-      }
-    }, 30);
-
-    return () => {
-      stopPolling();
-    };
   }, []);
 
   useEffect(() => {
-    loadDevices();
-  }, [filter]);
+    if (filter.status_filter || filter.location_filter) {
+      loadDevicesFiltered();
+    }
+  }, [filter.status_filter, filter.location_filter]);
 
   const loadDashboardData = async () => {
     try {
+      setIsLoading(true);
       const response = await getDashboardData();
       setDashboardData(response.data);
+      const devicesList = Array.isArray(response.devices) ? response.devices : (response.devices?.devices || []);
+      setDevices(devicesList);
     } catch (err) {
       console.error('Erro ao carregar dashboard:', err);
       setError('Erro ao carregar dados do dashboard');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const loadDevices = async () => {
+  const loadDevicesFiltered = async () => {
     try {
       setIsLoading(true);
-      const response = await listDevices(filter);
+      const response = await listDevices({ ...filter, limit: 100 });
       const devicesList = Array.isArray(response) ? response : (response.devices || []);
       setDevices(devicesList);
     } catch (err) {
@@ -71,7 +66,6 @@ const DeviceMonitoringDashboard = () => {
       setIsRefreshing(true);
       const response = await checkOfflineDevices();
       if (response.updated_count > 0) {
-        await loadDevices();
         await loadDashboardData();
       }
     } catch (err) {
@@ -82,8 +76,19 @@ const DeviceMonitoringDashboard = () => {
   };
 
   const handleDeviceStatusUpdate = async () => {
-    await loadDevices();
-    await loadDashboardData();
+    if (filter.status_filter || filter.location_filter) {
+      await loadDevicesFiltered();
+    } else {
+      await loadDashboardData();
+    }
+  };
+
+  const handleRefreshAll = async () => {
+    if (filter.status_filter || filter.location_filter) {
+      await loadDevicesFiltered();
+    } else {
+      await loadDashboardData();
+    }
   };
 
   const handleViewDetails = (device) => {
@@ -93,7 +98,6 @@ const DeviceMonitoringDashboard = () => {
 
   const handleAddDevice = async () => {
     setShowAddModal(false);
-    await loadDevices();
     await loadDashboardData();
   };
 
@@ -120,7 +124,7 @@ const DeviceMonitoringDashboard = () => {
         <div className="flex space-x-3">
           <Button
             variant="primary"
-            onClick={loadDevices}
+            onClick={handleRefreshAll}
             disabled={isLoading}
           >
             {isLoading ? (
@@ -130,7 +134,7 @@ const DeviceMonitoringDashboard = () => {
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                 </svg>
-                Atualizar dispositivos
+                Atualizar Tudo
               </>
             )}
           </Button>
@@ -235,7 +239,7 @@ const DeviceMonitoringDashboard = () => {
         <Card>
           <div className="text-center py-8">
             <p className="text-red-500 dark:text-red-400">{error}</p>
-            <Button variant="primary" onClick={() => { setError(null); loadDevices(); }} className="mt-4">
+            <Button variant="primary" onClick={() => { setError(null); loadDashboardData(); }} className="mt-4">
               Tentar Novamente
             </Button>
           </div>
@@ -262,7 +266,6 @@ const DeviceMonitoringDashboard = () => {
             setSelectedDevice(null);
           }}
           onUpdate={() => {
-            loadDevices();
             loadDashboardData();
           }}
         />

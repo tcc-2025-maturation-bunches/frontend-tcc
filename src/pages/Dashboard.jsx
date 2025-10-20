@@ -8,7 +8,7 @@ import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
 import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
 import InferenceHistoryTablePaginated from '../components/Dashboard/InferenceHistoryTablePaginated';
-import { getAllInferenceHistory, startHistoryPolling } from '../api/inferenceApi';
+import { getAllInferenceHistory } from '../api/inferenceApi';
 import { getInferenceStats } from '../api/resultQueryApi';
 import useAppConfig from '../hooks/useAppConfig';
 import { toast } from 'react-toastify';
@@ -18,14 +18,14 @@ const Dashboard = () => {
   const { config: appConfig, isLoading: isConfigLoading } = useAppConfig();
   const [activeTab, setActiveTab] = useState('analysis');
   const [inference, setInference] = useState(null);
-  const [allHistory, setAllHistory] = useState([]);
   const [apiStatsData, setApiStatsData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
   const [selectedInference, setSelectedInference] = useState(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [apiError, setApiError] = useState(null);
-  const [pollingEnabled, setPollingEnabled] = useState(false);
+  const [pollingEnabled, setPollingEnabled] = useState(true);
+  const [pollingIntervalId, setPollingIntervalId] = useState(null);
   const [statsStartDate, setStatsStartDate] = useState(() => {
     const date = new Date();
     const year = date.getFullYear();
@@ -40,6 +40,7 @@ const Dashboard = () => {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+  const [paginatedTableRef, setPaginatedTableRef] = useState(null);
 
   useEffect(() => {
     if (!isConfigLoading && user?.id) {
@@ -48,32 +49,37 @@ const Dashboard = () => {
   }, [isConfigLoading, user]);
 
   useEffect(() => {
-    let stopPolling;
+    let intervalId;
+    
+    const updateData = async () => {
+      try {
+        const recentResponse = await getAllInferenceHistory(1, 1);
+        if (recentResponse.items && recentResponse.items.length > 0) {
+          setInference(recentResponse.items[0]);
+        }
+        
+        if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
+          paginatedTableRef.refreshCurrentPage();
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar dados automaticamente:', error);
+      }
+    };
     
     if (pollingEnabled && user?.id) {
-      stopPolling = startHistoryPolling(user.id, (error, data) => {
-        if (error) {
-          console.error('Polling error:', error);
-        } else if (data) {
-          setAllHistory(data);
-          if (data.length > 0) {
-            const sorted = [...data].sort((a, b) => 
-              new Date(b.processing_timestamp) - new Date(a.processing_timestamp)
-            );
-            setInference(sorted[0]);
-          } else {
-            setInference(null);
-          }
-        }
-      }, 60);
+      updateData();
+      
+      intervalId = setInterval(updateData, 60000);
+      setPollingIntervalId(intervalId);
     }
 
     return () => {
-      if (stopPolling) {
-        stopPolling();
+      if (intervalId) {
+        clearInterval(intervalId);
+        setPollingIntervalId(null);
       }
     };
-  }, [pollingEnabled, user]);
+  }, [pollingEnabled, user, paginatedTableRef]);
 
   const loadStatsFromApi = async (startDate = statsStartDate, endDate = statsEndDate) => {
     try {
@@ -111,18 +117,11 @@ const Dashboard = () => {
       setIsLoadingData(true);
       setApiError(null);
       
-      const allHistoryResponse = await getAllInferenceHistory(1, 1);
-      const history = allHistoryResponse.items || [];
-      
-      setAllHistory(history);
+      const recentResponse = await getAllInferenceHistory(1, 1);
+      const history = recentResponse.items || [];
       
       if (history && history.length > 0) {
-        const sorted = [...history].sort((a, b) => {
-          const dateA = new Date(a.created_at || a.processing_timestamp);
-          const dateB = new Date(b.created_at || b.processing_timestamp);
-          return dateB - dateA;
-        });
-        setInference(sorted[0]);
+        setInference(history[0]);
       } else {
         setInference(null);
       }
@@ -140,7 +139,6 @@ const Dashboard = () => {
         toast.error('Erro ao carregar histórico de análises');
       }
       
-      setAllHistory([]);
       setInference(null);
     } finally {
       setIsLoadingData(false);
@@ -157,7 +155,7 @@ const Dashboard = () => {
     setSelectedInference(null);
   };
 
-  const handleInferenceCreated = (newInference) => {
+  const handleInferenceCreated = async (newInference) => {
     if (newInference?.action === 'reopen_modal') {
       setShowWebcamModal(true);
       return;
@@ -179,24 +177,11 @@ const Dashboard = () => {
       metadata: newInference.metadata || {}
     };
     
-    setAllHistory(prev => {
-      const existingIndex = prev.findIndex(item => 
-        item.image_id === formattedInference.image_id || 
-        item.request_id === formattedInference.request_id
-      );
-      
-      let updated;
-      if (existingIndex >= 0) {
-        updated = [...prev];
-        updated[existingIndex] = formattedInference;
-      } else {
-        updated = [formattedInference, ...prev];
-      }
-      updated.sort((a, b) => new Date(b.processing_timestamp) - new Date(a.processing_timestamp));
-      return updated;
-    });
-    
     setInference(formattedInference);
+
+    if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
+      paginatedTableRef.refreshCurrentPage();
+    }
 
     loadStatsFromApi();
     
@@ -384,7 +369,8 @@ const Dashboard = () => {
             <div className="mt-6">
               <InferenceHistoryTablePaginated 
                 userId={user.id}
-                onViewDetails={handleViewDetails} 
+                onViewDetails={handleViewDetails}
+                onRefReady={setPaginatedTableRef}
               />
             </div>
           </>

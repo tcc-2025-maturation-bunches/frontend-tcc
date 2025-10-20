@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Pagination from '../common/Pagination';
 import usePaginatedInferences from '../../hooks/usePaginatedInferences';
 import { getInferenceDetails } from '../../api/inferenceApi';
 import Loader from '../common/Loader';
 
-const InferenceHistoryTablePaginated = ({ userId, onViewDetails }) => {
+const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) => {
   const ITEMS_PER_PAGE = 25;
 
   const {
@@ -22,6 +22,12 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails }) => {
     clearFilters,
     itemsPerPage
   } = usePaginatedInferences(userId, ITEMS_PER_PAGE);
+
+  useEffect(() => {
+    if (onRefReady && typeof onRefReady === 'function') {
+      onRefReady({ refreshCurrentPage });
+    }
+  }, [onRefReady, refreshCurrentPage]);
 
   const [sortField, setSortField] = useState('processing_timestamp');
   const [sortDirection, setSortDirection] = useState('desc');
