@@ -80,18 +80,26 @@ export const getAllResults = async (params = {}) => {
     statusFilter = null,
     userId = null,
     deviceId = null,
-    excludeErrors = true
+    startDate = null,
+    endDate = null
   } = params;
 
   const queryParams = {
     page,
-    page_size: pageSize,
-    exclude_errors: excludeErrors
+    page_size: pageSize
   };
+
+  if (statusFilter === 'error' || statusFilter === 'partial_error') {
+    queryParams.exclude_errors = false;
+  } else {
+    queryParams.exclude_errors = true;
+  }
 
   if (statusFilter) queryParams.status_filter = statusFilter;
   if (userId) queryParams.user_id = userId;
   if (deviceId) queryParams.device_id = deviceId;
+  if (startDate) queryParams.start_date = startDate;
+  if (endDate) queryParams.end_date = endDate;
 
   const response = await resultQueryClient.get(endpoints.allResults, {
     params: queryParams

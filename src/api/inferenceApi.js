@@ -154,12 +154,16 @@ export const getInferenceHistory = async (userId, limit = 100) => {
   }
 };
 
-export const getAllInferenceHistory = async (page = 1, pageSize = 25) => {
+export const getAllInferenceHistory = async (page = 1, pageSize = 25, filters = {}) => {
   try {
     const response = await getAllResults({
       page,
       pageSize,
-      excludeErrors: true
+      statusFilter: filters.statusFilter,
+      userId: filters.userId,
+      deviceId: filters.deviceId,
+      startDate: filters.startDate,
+      endDate: filters.endDate
     });
 
     const transformedData = transformBackendDataToFrontend(response.items || []);

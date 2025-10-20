@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllInferenceHistory } from '../api/inferenceApi';
 
-const usePaginatedInferences = (userId, itemsPerPage = 50) => {
+const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) => {
   const [data, setData] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -9,13 +9,14 @@ const usePaginatedInferences = (userId, itemsPerPage = 50) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
+  const [filters, setFilters] = useState(initialFilters);
 
-  const loadPage = useCallback(async (page, forceRefresh = false) => {
+  const loadPage = useCallback(async (page, currentFilters = filters, forceRefresh = false) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await getAllInferenceHistory(page, itemsPerPage);
+      const response = await getAllInferenceHistory(page, itemsPerPage, currentFilters);
 
       setData(response.items || []);
       setCurrentPage(response.current_page || page);
@@ -32,17 +33,17 @@ const usePaginatedInferences = (userId, itemsPerPage = 50) => {
     } finally {
       setIsLoading(false);
     }
-  }, [itemsPerPage, userId]);
+  }, [itemsPerPage]);
 
   const goToPage = useCallback((page) => {
     if (page < 1 || page > totalPages) return;
     setCurrentPage(page);
-    loadPage(page);
-  }, [loadPage, totalPages]);
+    loadPage(page, filters);
+  }, [loadPage, totalPages, filters]);
 
   const refreshCurrentPage = useCallback(() => {
-    loadPage(currentPage, true);
-  }, [currentPage, loadPage]);
+    loadPage(currentPage, filters, true);
+  }, [currentPage, filters, loadPage]);
 
   const resetPagination = useCallback(() => {
     setCurrentPage(1);
@@ -50,20 +51,32 @@ const usePaginatedInferences = (userId, itemsPerPage = 50) => {
     setTotalItems(0);
     setTotalPages(1);
     setHasMore(false);
-    loadPage(1);
+    loadPage(1, filters);
+  }, [loadPage, filters]);
+
+  const updateFilters = useCallback((newFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1);
+    loadPage(1, newFilters);
+  }, [loadPage]);
+
+  const clearFilters = useCallback(() => {
+    setFilters({});
+    setCurrentPage(1);
+    loadPage(1, {});
   }, [loadPage]);
 
   useEffect(() => {
     if (userId) {
-      loadPage(1);
+      loadPage(1, filters);
     } else {
-        setData([]);
-        setTotalItems(0);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setIsLoading(false);
+      setData([]);
+      setTotalItems(0);
+      setTotalPages(1);
+      setCurrentPage(1);
+      setIsLoading(false);
     }
-  }, [userId, itemsPerPage, loadPage]);
+  }, [userId, itemsPerPage]);
 
   return {
     data,
@@ -73,9 +86,12 @@ const usePaginatedInferences = (userId, itemsPerPage = 50) => {
     error,
     hasMore,
     totalItems,
+    filters,
     goToPage,
     refreshCurrentPage,
     resetPagination,
+    updateFilters,
+    clearFilters,
     itemsPerPage
   };
 };
