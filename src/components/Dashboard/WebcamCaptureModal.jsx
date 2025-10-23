@@ -47,7 +47,7 @@ const getDeviceInfo = () => {
 };
 
 const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
-  const [step, setStep] = useState(1); // 1: permission, 2: captura, 3: Resultado
+  const [step, setStep] = useState(1);
   const [location, setLocation] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingError, setProcessingError] = useState(null);
@@ -59,11 +59,8 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
     capturedImage,
     isUploading,
     uploadError,
-    uploadedImageUrl,
-    uploadedImageId,
     requestCameraAccess,
     captureImage,
-    resetImage,
     uploadImage
   } = useWebcamCapture();
 
@@ -384,26 +381,33 @@ const WebcamCaptureModal = ({ onClose, onInferenceCreated, userId }) => {
                     {result.summary?.maturation_counts && (
                       <div className="mt-4">
                         <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Distribuição:</h4>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
                             <div className="w-2 h-2 bg-green-500 rounded-full mx-auto mb-1"></div>
                             <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
                             <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                              {result.summary.maturation_counts.green || 0}
+                              {result.summary.maturation_counts.verde || 0}
+                            </p>
+                          </div>
+                          <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
+                            <div className="w-2 h-2 bg-lime-500 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Q. Mad.</span>
+                            <p className="text-sm font-semibold text-lime-600 dark:text-lime-400">
+                              {result.summary.maturation_counts.quase_maduro || 0}
                             </p>
                           </div>
                           <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
                             <div className="w-2 h-2 bg-yellow-500 rounded-full mx-auto mb-1"></div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Maduros</span>
                             <p className="text-sm font-semibold text-yellow-600 dark:text-yellow-400">
-                              {result.summary.maturation_counts.ripe || 0}
+                              {result.summary.maturation_counts.maduro || 0}
                             </p>
                           </div>
                           <div className="bg-white dark:bg-gray-800 p-2 rounded-md text-center">
                             <div className="w-2 h-2 bg-red-500 rounded-full mx-auto mb-1"></div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">M.Mad./Pass.</span>
                             <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                              {result.summary.maturation_counts.overripe || 0}
+                              {result.summary.maturation_counts.muito_maduro_ou_passado || 0}
                             </p>
                           </div>
                         </div>

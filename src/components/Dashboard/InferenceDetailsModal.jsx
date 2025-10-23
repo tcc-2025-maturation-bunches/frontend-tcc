@@ -1,4 +1,8 @@
+import React from 'react';
+
 const InferenceDetailsModal = ({ inference, onClose }) => {
+  const [fullscreenImage, setFullscreenImage] = React.useState(null);
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     
@@ -30,15 +34,72 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
 
   const getCategoryColor = (category) => {
     switch (category?.toLowerCase()) {
-      case 'green':
+      case 'verde':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'ripe':
+      case 'quase_maduro':
+        return 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200';
+      case 'maduro':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'overripe':
+      case 'muito_maduro_ou_passado':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'completed':
+      case 'success':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'processing':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'error':
+      case 'failed':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
+  };
+
+  const getCategoryLabel = (category) => {
+    switch (category?.toLowerCase()) {
+      case 'verde':
+        return 'Verde';
+      case 'quase_maduro':
+        return 'Quase Maduro';
+      case 'maduro':
+        return 'Maduro';
+      case 'muito_maduro_ou_passado':
+        return 'Muito Maduro ou Passado';
+      default:
+        return category;
+    }
+  };
+
+  const getMaturationCounts = () => {
+    const maturationDist = inference.processing_metadata?.maturation_distribution;
+    if (maturationDist) {
+      return {
+        verde: parseInt(maturationDist.verde || 0),
+        quase_maduro: parseInt(maturationDist.quase_maduro || 0),
+        maduro: parseInt(maturationDist.maduro || 0),
+        muito_maduro_ou_passado: parseInt(maturationDist.muito_maduro_ou_passado || 0),
+        nao_analisado: parseInt(maturationDist.nao_analisado || 0),
+      };
+    }
+    
+    const summaryCounts = inference.summary?.maturation_counts;
+    if (summaryCounts) {
+      return {
+        verde: parseInt(summaryCounts.verde || 0),
+        quase_maduro: parseInt(summaryCounts.quase_maduro || 0),
+        maduro: parseInt(summaryCounts.maduro || 0),
+        muito_maduro_ou_passado: parseInt(summaryCounts.muito_maduro_ou_passado || 0),
+        nao_analisado: parseInt(summaryCounts.nao_analisado || 0),
+      };
+    }
+    
+    return {
+      verde: 0,
+      quase_maduro: 0,
+      maduro: 0,
+      muito_maduro_ou_passado: 0,
+      nao_analisado: 0,
+    };
   };
 
   return (
@@ -47,7 +108,11 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Detalhes da Análise</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">ID: {inference.image_id}</p>
+            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+              <span>ID: {inference.image_id}</span>
+              {inference.request_id && <span>Request: {inference.request_id}</span>}
+              {inference.device_id && <span>Device: {inference.device_id}</span>}
+            </div>
           </div>
           <button 
             onClick={onClose}
@@ -61,205 +126,233 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div className="lg:col-span-2">
-              <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Imagens</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Imagem Original</h4>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div>
+              <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Imagem Original</h4>
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12 relative group">
+                {inference.image_url ? (
+                  <>
                     <img
                       src={inference.image_url}
                       alt="Imagem original"
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer"
                       onError={(e) => {
                         e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Imagem+Original';
                       }}
+                      onClick={() => setFullscreenImage(inference.image_url)}
                     />
+                    <div 
+                      className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      onClick={() => setFullscreenImage(inference.image_url)}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className="h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
+                    <p>Imagem original não disponível</p>
                   </div>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Resultado da Análise</h4>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12">
-                    {inference.image_result_url ? (
-                      <img
-                        src={inference.image_result_url}
-                        alt="Resultado da análise"
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Análise';
-                        }}
-                      />
-                    ) : (
-                      <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
-                        <p>Resultado não disponível</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
+            <div>
+              <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Resultado da Análise</h4>
+              <div className="bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden aspect-w-16 aspect-h-12 relative group">
+                {inference.image_result_url ? (
+                  <>
+                    <img
+                      src={inference.image_result_url}
+                      alt="Resultado da análise"
+                      className="w-full h-full object-cover cursor-pointer"
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/400x300/E5E7EB/9CA3AF?text=Resultado+da+Análise';
+                      }}
+                      onClick={() => setFullscreenImage(inference.image_result_url)}
+                    />
+                    <div 
+                      className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center cursor-pointer"
+                      onClick={() => setFullscreenImage(inference.image_result_url)}
+                    >
+                      <svg 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className="h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-center items-center h-full text-gray-500 dark:text-gray-400">
+                    <p>Resultado não disponível</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
 
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             <div>
               <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Resumo da Análise</h3>
               <div className="space-y-4">
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div>
-                      <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Verdes</span>
-                      <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                        {inference.summary?.maturation_counts?.green || 0}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="w-4 h-4 bg-yellow-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Maduras</span>
-                      <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                        {inference.summary?.maturation_counts?.ripe || 0}
-                      </p>
-                    </div>
-                    <div>
-                      <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-1"></div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">Passadas</span>
-                      <p className="text-lg font-semibold text-red-600 dark:text-red-400">
-                        {inference.summary?.maturation_counts?.overripe || 0}
-                      </p>
-                    </div>
-                  </div>
+                  {(() => {
+                    const counts = getMaturationCounts();
+                    const total = counts.verde + counts.quase_maduro + counts.maduro + counts.muito_maduro_ou_passado + counts.nao_analisado;
+                    
+                    return (
+                      <div className="grid grid-cols-4 gap-2 text-center">
+                        <div>
+                          <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-1"></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Verde</span>
+                          <p className="text-lg font-semibold text-green-600 dark:text-green-400">
+                            {counts.verde}
+                          </p>
+                        </div>
+                        <div>
+                          <div className="w-4 h-4 bg-lime-500 rounded-full mx-auto mb-1"></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Quase Mad.</span>
+                          <p className="text-lg font-semibold text-lime-600 dark:text-lime-400">
+                            {counts.quase_maduro}
+                          </p>
+                        </div>
+                        <div>
+                          <div className="w-4 h-4 bg-yellow-500 rounded-full mx-auto mb-1"></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Maduro</span>
+                          <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                            {counts.maduro}
+                          </p>
+                        </div>
+                        <div>
+                          <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-1"></div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Muito Mad./Passado</span>
+                          <p className="text-lg font-semibold text-red-600 dark:text-red-400">
+                            {counts.muito_maduro_ou_passado}
+                          </p>
+                        </div>
+                        {counts.nao_analisado > 0 && (
+                          <div className="col-span-4 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                            <div className="w-4 h-4 bg-gray-400 rounded-full mx-auto mb-1"></div>
+                            <span className="text-xs text-gray-500 dark:text-gray-400">Não Analisado</span>
+                            <p className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                              {counts.nao_analisado}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Total de Objetos:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {inference.summary?.total_objects || 0}
+                      {inference.detection_result?.summary?.total_objects || 
+                       inference.summary?.total_objects || 0}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Maturação Média:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatMaturationScore(inference.summary?.average_maturation_score)}
+                      {formatMaturationScore(
+                        inference.detection_result?.summary?.average_maturation_score || 
+                        inference.summary?.average_maturation_score
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Confiança Média:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatConfidence(inference.summary?.average_confidence)}
+                      {formatConfidence(
+                        inference.detection_result?.results?.length > 0 
+                          ? inference.detection_result.results.reduce((sum, r) => sum + parseFloat(r.confidence || 0), 0) / inference.detection_result.results.length
+                          : inference.summary?.average_confidence
+                      )}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-500 dark:text-gray-400">Tempo Total:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
-                      {formatProcessingTime(inference.summary?.total_processing_time_ms)}
+                      {formatProcessingTime(
+                        inference.processing_time_ms || 
+                        inference.summary?.total_processing_time_ms
+                      )}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Informações Gerais</h3>
               <dl className="space-y-3">
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Data/Hora:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatDate(inference.processing_timestamp)}
+                    {formatDate(inference.created_at || inference.processing_timestamp)}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Local:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {inference.location || 'N/A'}
+                    {inference.initial_metadata?.location || inference.location || 'N/A'}
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Status:</dt>
                   <dd className="text-sm font-medium">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(inference.status)}`}>
-                      {inference.status === 'completed' ? 'Concluído' : 
+                      {inference.status === 'completed' || inference.status === 'success' ? 'Concluído' : 
                        inference.status === 'processing' ? 'Processando' : 
-                       inference.status === 'error' ? 'Erro' : inference.status}
+                       inference.status === 'error' || inference.status === 'failed' ? 'Erro' : inference.status}
                     </span>
                   </dd>
                 </div>
                 <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                   <dt className="text-sm text-gray-500 dark:text-gray-400">Fonte:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {inference.metadata?.source === 'webcam' ? 'Webcam' : 
-                     inference.metadata?.source === 'monitoring' ? 'Monitoramento' : 'N/A'}
+                    {inference.initial_metadata?.processing_type === 'combined' ? 'Processamento Combinado' :
+                     inference.metadata?.source === 'webcam' ? 'Webcam' : 
+                     inference.metadata?.source === 'monitoring' ? 'Monitoramento' : 
+                     inference.device_id ? 'Dispositivo' : 'N/A'}
                   </dd>
                 </div>
-                {inference.metadata?.environmental && (
-                  <>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Iluminação:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200 capitalize">
-                        {inference.metadata.environmental.lighting_conditions || 'N/A'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Temperatura Est.:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.environmental.estimated_temperature 
-                          ? `${inference.metadata.environmental.estimated_temperature}°C` 
-                          : 'N/A'}
-                      </dd>
-                    </div>
-                  </>
+                {inference.device_id && (
+                  <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Dispositivo:</dt>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                      {inference.device_id}
+                    </dd>
+                  </div>
                 )}
-              </dl>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-medium mb-3 text-gray-700 dark:text-gray-300">Tempos de Processamento</h3>
-              <dl className="space-y-3">
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Detecção:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.detection_time_ms)}
-                  </dd>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Análise de Maturação:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.maturation_analysis_time_ms)}
-                  </dd>
-                </div>
-                <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                  <dt className="text-sm text-gray-500 dark:text-gray-400">Tempo Total:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                    {formatProcessingTime(inference.summary?.total_processing_time_ms)}
-                  </dd>
-                </div>
-                {inference.metadata?.camera_settings && (
-                  <>
-                    <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Resolução:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.camera_settings.resolution || 'N/A'}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <dt className="text-sm text-gray-500 dark:text-gray-400">Qualidade:</dt>
-                      <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {inference.metadata.camera_settings.quality 
-                          ? `${inference.metadata.camera_settings.quality}%` 
-                          : 'N/A'}
-                      </dd>
-                    </div>
-                  </>
+                {inference.processing_metadata?.image_dimensions && (
+                  <div className="flex justify-between py-2">
+                    <dt className="text-sm text-gray-500 dark:text-gray-400">Dimensões:</dt>
+                    <dd className="text-sm font-medium text-gray-900 dark:text-gray-200">
+                      {inference.processing_metadata.image_dimensions.width} x {inference.processing_metadata.image_dimensions.height}
+                    </dd>
+                  </div>
                 )}
               </dl>
             </div>
           </div>
 
-          {inference.results && inference.results.length > 0 && (
+          {(inference.detection_result?.results || inference.results) && 
+           (inference.detection_result?.results?.length > 0 || inference.results?.length > 0) && (
             <div className="mt-8">
               <h3 className="text-lg font-medium mb-4 text-gray-700 dark:text-gray-300">
-                Resultados Detalhados ({inference.results.length} itens)
+                Resultados Detalhados ({(inference.detection_result?.results || inference.results).length} itens)
               </h3>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -280,13 +373,10 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                       <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Categoria
                       </th>
-                      <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Dias até Estragar
-                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                    {inference.results.map((result, index) => (
+                    {(inference.detection_result?.results || inference.results).map((result, index) => (
                       <tr key={`result-${inference.image_id}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                           {index + 1}
@@ -301,11 +391,11 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                             <div className="w-16 bg-gray-200 rounded-full h-2 dark:bg-gray-700 mr-2">
                               <div 
                                 className="bg-blue-500 h-2 rounded-full" 
-                                style={{ width: `${(result.confidence * 100)}%` }}
+                                style={{ width: `${(parseFloat(result.confidence) * 100)}%` }}
                               ></div>
                             </div>
                             <span className="text-xs font-medium">
-                              {formatConfidence(result.confidence)}
+                              {formatConfidence(parseFloat(result.confidence))}
                             </span>
                           </div>
                         </td>
@@ -313,52 +403,27 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                           <div className="flex items-center">
                             <div className="w-16 bg-gray-200 rounded-full h-2 dark:bg-gray-700 mr-2">
                               <div 
-                                className="bg-gradient-to-r from-green-500 to-yellow-500 h-2 rounded-full" 
+                                className="bg-gradient-to-r from-green-500 to-red-500 h-2 rounded-full" 
                                 style={{ 
                                   width: `${result.maturation_level?.score 
-                                    ? (result.maturation_level.score * 100) 
+                                    ? (parseFloat(result.maturation_level.score) * 100) 
                                     : 0}%` 
                                 }}
                               ></div>
                             </div>
                             <span className="text-xs font-medium">
-                              {formatMaturationScore(result.maturation_level?.score)}
+                              {formatMaturationScore(parseFloat(result.maturation_level?.score))}
                             </span>
                           </div>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm">
                           {result.maturation_level?.category ? (
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(result.maturation_level.category)}`}>
-                              {result.maturation_level.category === 'green' ? 'Verde' :
-                               result.maturation_level.category === 'ripe' ? 'Maduro' :
-                               result.maturation_level.category === 'overripe' ? 'Passado' :
-                               result.maturation_level.category}
+                              {getCategoryLabel(result.maturation_level.category)}
                             </span>
                           ) : (
                             <span className="text-gray-400">N/A</span>
                           )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center">
-                            {result.maturation_level?.estimated_days_until_spoilage !== undefined ? (
-                              <>
-                                <span className={`font-medium ${
-                                  result.maturation_level.estimated_days_until_spoilage <= 1 
-                                    ? 'text-red-600 dark:text-red-400' 
-                                    : result.maturation_level.estimated_days_until_spoilage <= 3 
-                                      ? 'text-yellow-600 dark:text-yellow-400' 
-                                      : 'text-green-600 dark:text-green-400'
-                                }`}>
-                                  {result.maturation_level.estimated_days_until_spoilage}
-                                </span>
-                                <span className="ml-1 text-xs">
-                                  {result.maturation_level.estimated_days_until_spoilage === 1 ? 'dia' : 'dias'}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-gray-400">N/A</span>
-                            )}
-                          </div>
                         </td>
                       </tr>
                     ))}
@@ -378,6 +443,29 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
           </button>
         </div>
       </div>
+
+      {fullscreenImage && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-[60] p-4"
+          onClick={() => setFullscreenImage(null)}
+        >
+          <button 
+            onClick={() => setFullscreenImage(null)}
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 rounded-md hover:bg-white hover:bg-opacity-10 transition-colors z-10"
+            aria-label="Fechar visualização em tela cheia"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          <img
+            src={fullscreenImage}
+            alt="Imagem em tela cheia"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 };

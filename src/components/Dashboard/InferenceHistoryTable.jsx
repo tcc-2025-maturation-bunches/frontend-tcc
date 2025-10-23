@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Card from '../common/Card';
 import Loader from '../common/Loader';
+import { getInferenceDetails } from '../../api/inferenceApi';
 
 const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
   const [sortField, setSortField] = useState('processing_timestamp');
@@ -56,16 +57,37 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
     }).format(date);
   };
 
-  const handleRowClick = (inference) => {
-    onViewDetails(inference);
+  const handleRowClick = async (inference) => {
+    try {
+      if (inference.request_id) {
+        const detailedInference = await getInferenceDetails(inference.request_id);
+        onViewDetails(detailedInference);
+      } else {
+        onViewDetails(inference);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar detalhes:', error);
+      onViewDetails(inference);
+    }
   };
 
   const renderSortIndicator = (field) => {
-    if (sortField !== field) return null;
+    if (sortField !== field) {
+      return (
+        <svg className="ml-1 w-3 h-3 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      );
+    }
+    
     return sortDirection === 'asc' ? (
-      <span className="ml-1 text-gray-400">▲</span>
+      <svg className="ml-1 w-3 h-3 text-gray-700 dark:text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+      </svg>
     ) : (
-      <span className="ml-1 text-gray-400">▼</span>
+      <svg className="ml-1 w-3 h-3 text-gray-700 dark:text-gray-300" fill="currentColor" viewBox="0 0 20 20">
+        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+      </svg>
     );
   };
 
@@ -86,7 +108,7 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
     <>
       <Card
         title="Histórico de Análises"
-        subtitle={`${sortedData.length} análises encontradas`}
+        subtitle={`Veja as últimas análises realizadas (${data ? data.length : 0} registros)`}
         className="h-full"
         bodyClassName="p-0"
       >
@@ -233,8 +255,9 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
                           </span>
                           <div className="ml-2 flex space-x-1">
                             <div className="w-2 h-2 bg-green-500 rounded-full" title="Verdes"></div>
-                            <div className="w-2 h-2 bg-yellow-500 rounded-full" title="Maduras"></div>
-                            <div className="w-2 h-2 bg-red-500 rounded-full" title="Passadas"></div>
+                            <div className="w-2 h-2 bg-lime-500 rounded-full" title="Quase Maduros"></div>
+                            <div className="w-2 h-2 bg-yellow-500 rounded-full" title="Maduros"></div>
+                            <div className="w-2 h-2 bg-red-500 rounded-full" title="Muito Maduros ou Passados"></div>
                           </div>
                         </div>
                       </td>
