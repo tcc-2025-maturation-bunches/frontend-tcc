@@ -58,13 +58,13 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
   const getCategoryLabel = (category) => {
     switch (category?.toLowerCase()) {
       case 'verde':
-        return 'Verde';
+        return 'Verde(s)';
       case 'quase_maduro':
-        return 'Quase Maduro';
+        return 'Quase Maduro(s)';
       case 'maduro':
-        return 'Maduro';
+        return 'Maduro(s)';
       case 'muito_maduro_ou_passado':
-        return 'Muito Maduro ou Passado';
+        return 'Muito Maduro(s)/Passado(s)';
       default:
         return category;
     }
@@ -208,48 +208,96 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                 <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
                   {(() => {
                     const counts = getMaturationCounts();
-                    const total = counts.verde + counts.quase_maduro + counts.maduro + counts.muito_maduro_ou_passado + counts.nao_analisado;
+                    const total = counts.verde + counts.quase_maduro + counts.maduro + counts.muito_maduro_ou_passado;
+                    const totalWithUnanalyzed = total + counts.nao_analisado;
+                    
+                    const calculatePercentage = (value) => {
+                      if (total === 0) return 0;
+                      return ((value / total) * 100).toFixed(1);
+                    };
+
+                    const maturationCategories = [
+                      {
+                        id: 'verde',
+                        label: 'Verde',
+                        count: counts.verde,
+                        color: 'green',
+                        bgClass: 'bg-green-500',
+                        textClass: 'text-green-600 dark:text-green-400'
+                      },
+                      {
+                        id: 'quase_maduro',
+                        label: 'Quase Mad.',
+                        count: counts.quase_maduro,
+                        color: 'lime',
+                        bgClass: 'bg-lime-500',
+                        textClass: 'text-lime-600 dark:text-lime-400'
+                      },
+                      {
+                        id: 'maduro',
+                        label: 'Maduro',
+                        count: counts.maduro,
+                        color: 'yellow',
+                        bgClass: 'bg-yellow-500',
+                        textClass: 'text-yellow-600 dark:text-yellow-400'
+                      },
+                      {
+                        id: 'muito_maduro_ou_passado',
+                        label: 'Muito Mad./Passado',
+                        count: counts.muito_maduro_ou_passado,
+                        color: 'red',
+                        bgClass: 'bg-red-500',
+                        textClass: 'text-red-600 dark:text-red-400'
+                      }
+                    ];
                     
                     return (
-                      <div className="grid grid-cols-4 gap-2 text-center">
-                        <div>
-                          <div className="w-4 h-4 bg-green-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Verde</span>
-                          <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                            {counts.verde}
-                          </p>
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                          {maturationCategories.map((category) => (
+                            <div key={category.id} className="flex flex-col items-center">
+                              <div className={`w-4 h-4 ${category.bgClass} rounded-full mb-1`} aria-hidden="true"></div>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                {category.label}
+                              </span>
+                              <p className={`text-lg font-semibold ${category.textClass}`}>
+                                {category.count}
+                              </p>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                                {calculatePercentage(category.count)}%
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                        <div>
-                          <div className="w-4 h-4 bg-lime-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Quase Mad.</span>
-                          <p className="text-lg font-semibold text-lime-600 dark:text-lime-400">
-                            {counts.quase_maduro}
-                          </p>
+                        
+                        <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Total Analisado:
+                            </span>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                              {total}
+                            </span>
+                          </div>
                         </div>
-                        <div>
-                          <div className="w-4 h-4 bg-yellow-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Maduro</span>
-                          <p className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
-                            {counts.maduro}
-                          </p>
-                        </div>
-                        <div>
-                          <div className="w-4 h-4 bg-red-500 rounded-full mx-auto mb-1"></div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Muito Mad./Passado</span>
-                          <p className="text-lg font-semibold text-red-600 dark:text-red-400">
-                            {counts.muito_maduro_ou_passado}
-                          </p>
-                        </div>
+
                         {counts.nao_analisado > 0 && (
-                          <div className="col-span-4 mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
-                            <div className="w-4 h-4 bg-gray-400 rounded-full mx-auto mb-1"></div>
-                            <span className="text-xs text-gray-500 dark:text-gray-400">Não Analisado</span>
-                            <p className="text-lg font-semibold text-gray-600 dark:text-gray-400">
-                              {counts.nao_analisado}
-                            </p>
+                          <div className="pt-3 border-t border-gray-200 dark:border-gray-600">
+                            <div className="flex flex-col items-center">
+                              <div className="w-4 h-4 bg-gray-400 rounded-full mb-1" aria-hidden="true"></div>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                Não Analisado
+                              </span>
+                              <p className="text-lg font-semibold text-gray-600 dark:text-gray-400">
+                                {counts.nao_analisado}
+                              </p>
+                              <span className="text-xs text-gray-400 dark:text-gray-500">
+                                {totalWithUnanalyzed > 0 ? ((counts.nao_analisado / totalWithUnanalyzed) * 100).toFixed(1) : 0}%
+                              </span>
+                            </div>
                           </div>
                         )}
-                      </div>
+                      </>
                     );
                   })()}
                 </div>
@@ -263,7 +311,7 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Maturação Média:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Confiança média de maturação:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatMaturationScore(
                         inference.detection_result?.summary?.average_maturation_score || 
@@ -272,12 +320,12 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">Confiança Média:</span>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">Confiança média de detecção:</span>
                     <span className="font-medium text-gray-900 dark:text-white">
                       {formatConfidence(
                         inference.detection_result?.results?.length > 0 
                           ? inference.detection_result.results.reduce((sum, r) => sum + parseFloat(r.confidence || 0), 0) / inference.detection_result.results.length
-                          : inference.summary?.average_confidence
+                          : inference.summary?.average_detection_confidence
                       )}
                     </span>
                   </div>
@@ -365,10 +413,10 @@ const InferenceDetailsModal = ({ inference, onClose }) => {
                         Tipo
                       </th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Confiança
+                        Confiança média de detecção
                       </th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Maturação
+                        Confiança média de maturação
                       </th>
                       <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Categoria

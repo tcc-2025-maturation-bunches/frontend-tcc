@@ -3,10 +3,10 @@ import Card from '../common/Card';
 import Loader from '../common/Loader';
 
 const MATURATION_CATEGORIES = {
-  'Verdes': { label: 'Verdes', color: '#22c55e' },
-  'Quase Maduros': { label: 'Quase Maduros', color: '#84cc16' },
-  'Maduros': { label: 'Maduros', color: '#eab308' },
-  'Muito Maduros ou Passados': { label: 'Muito Maduros ou Passados', color: '#ef4444' },
+  'Verdes': { label: 'Verde(s)', color: '#22c55e' },
+  'Quase Maduros': { label: 'Quase Maduro(s)', color: '#84cc16' },
+  'Maduros': { label: 'Maduro(s)', color: '#eab308' },
+  'Muito Maduros/Passados': { label: 'Muito Maduro(s)/Passado(s)', color: '#ef4444' },
 };
 
 const InferenceStats = ({ statsApiData, isLoading }) => {
@@ -74,7 +74,7 @@ const InferenceStats = ({ statsApiData, isLoading }) => {
                {barData.verde > 0 && <p className="text-xs" style={{ color: MATURATION_CATEGORIES.Verdes.color }}>Verdes: {barData.verde}</p>}
                {barData.quase_maduro > 0 && <p className="text-xs" style={{ color: MATURATION_CATEGORIES['Quase Maduros'].color }}>Quase Maduros: {barData.quase_maduro}</p>}
                {barData.maduro > 0 && <p className="text-xs" style={{ color: MATURATION_CATEGORIES.Maduros.color }}>Maduros: {barData.maduro}</p>}
-               {barData.muito_maduro_ou_passado > 0 && <p className="text-xs" style={{ color: MATURATION_CATEGORIES['Muito Maduros ou Passados'].color }}>Muito Maduros/Passados: {barData.muito_maduro_ou_passado}</p>}
+               {barData.muito_maduro_ou_passado > 0 && <p className="text-xs" style={{ color: MATURATION_CATEGORIES['Muito Maduros/Passados'].color }}>Muito Maduros/Passados: {barData.muito_maduro_ou_passado}</p>}
              </div>
           )}
         </div>
@@ -155,7 +155,7 @@ const InferenceStats = ({ statsApiData, isLoading }) => {
                   <Line type="linear" dataKey="verde" stroke={MATURATION_CATEGORIES.Verdes.color} name={MATURATION_CATEGORIES.Verdes.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   <Line type="linear" dataKey="quase_maduro" stroke={MATURATION_CATEGORIES['Quase Maduros'].color} name={MATURATION_CATEGORIES['Quase Maduros'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   <Line type="linear" dataKey="maduro" stroke={MATURATION_CATEGORIES.Maduros.color} name={MATURATION_CATEGORIES.Maduros.label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                  <Line type="linear" dataKey="muito_maduro_ou_passado" stroke={MATURATION_CATEGORIES['Muito Maduros ou Passados'].color} name={MATURATION_CATEGORIES['Muito Maduros ou Passados'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  <Line type="linear" dataKey="muito_maduro_ou_passado" stroke={MATURATION_CATEGORIES['Muito Maduros/Passados'].color} name={MATURATION_CATEGORIES['Muito Maduros/Passados'].label} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>

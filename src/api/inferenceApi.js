@@ -255,7 +255,7 @@ const transformBackendDataToFrontend = (backendData) => {
         total_objects: safeParseInt(summary.total_objects, results.length),
         objects_with_maturation: safeParseInt(summary.objects_with_maturation, 0),
         average_maturation_score: safeParseFloat(summary.average_maturation_score),
-        average_confidence: calculateAverageConfidence(results),
+        average_detection_confidence: calculateAverageConfidence(results),
         total_processing_time_ms: safeParseInt(item.processing_time_ms),
         detection_time_ms: safeParseInt(summary.detection_time_ms),
         maturation_analysis_time_ms: safeParseInt(summary.maturation_time_ms),
@@ -277,8 +277,13 @@ const transformBackendDataToFrontend = (backendData) => {
 const calculateAverageConfidence = (results) => {
   if (!results || results.length === 0) return 0;
 
-  const sum = results.reduce((acc, r) => acc + (safeParseFloat(r.confidence) || 0), 0);
-  return sum / results.length;
+  const sum = results.reduce((acc, r) => {
+    const confidence = safeParseFloat(r.confidence, 0);
+    return acc + confidence;
+  }, 0);
+  
+  const average = sum / results.length;
+  return Math.round(average * 10000) / 10000;
 };
 
 export const startHistoryPolling = (userId, callback, intervalSeconds = 60) => {
