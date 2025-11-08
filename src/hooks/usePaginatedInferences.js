@@ -10,6 +10,7 @@ const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) 
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [filters, setFilters] = useState(initialFilters);
+  const [mostRecentInference, setMostRecentInference] = useState(null);
 
   const loadPage = useCallback(async (page, currentFilters = filters, forceRefresh = false) => {
     try {
@@ -23,6 +24,14 @@ const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) 
       setTotalPages(response.total_pages || 1);
       setTotalItems(response.total_count || 0);
       setHasMore(response.has_next || false);
+      
+      if (page === 1 && Object.keys(currentFilters).every(key => !currentFilters[key])) {
+        if (response.items && response.items.length > 0) {
+          setMostRecentInference(response.items[0]);
+        } else {
+          setMostRecentInference(null);
+        }
+      }
 
     } catch (err) {
       console.error('Error loading page:', err);
@@ -30,6 +39,7 @@ const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) 
       setData([]);
       setTotalPages(1);
       setTotalItems(0);
+      setMostRecentInference(null);
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +97,7 @@ const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) 
     hasMore,
     totalItems,
     filters,
+    mostRecentInference,
     goToPage,
     refreshCurrentPage,
     resetPagination,
