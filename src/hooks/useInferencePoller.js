@@ -35,7 +35,6 @@ const useInferencePoller = (requestId) => {
           return;
         }
 
-        console.log('Polling status for request:', requestId);
         const statusResponse = await getProcessingStatus(requestId);
         
         if (!pollingActiveRef.current) {
@@ -45,7 +44,6 @@ const useInferencePoller = (requestId) => {
         setStatus(statusResponse);
 
         if (statusResponse.status === 'completed') {
-          console.log('Processing completed, fetching results...');
           try {
             const resultResponse = await getProcessingResults(requestId);
             setResult(resultResponse);
