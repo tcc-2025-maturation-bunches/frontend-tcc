@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import ThemeToggle from '../components/common/ThemeToggle';
 import RecentInference from '../components/Dashboard/RecentInference';
@@ -8,7 +8,6 @@ import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
 import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
 import InferenceHistoryTablePaginated from '../components/Dashboard/InferenceHistoryTablePaginated';
-import { getAllInferenceHistory } from '../api/inferenceApi';
 import { getInferenceStats } from '../api/resultQueryApi';
 import useAppConfig from '../hooks/useAppConfig';
 import { toast } from 'react-toastify';
@@ -17,7 +16,6 @@ const Dashboard = () => {
   const { user, logout } = useAuth();
   const { config: appConfig, isLoading: isConfigLoading } = useAppConfig();
   const [activeTab, setActiveTab] = useState('analysis');
-  const [inference, setInference] = useState(null);
   const [apiStatsData, setApiStatsData] = useState(null);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [showWebcamModal, setShowWebcamModal] = useState(false);
@@ -41,48 +39,14 @@ const Dashboard = () => {
     return `${year}-${month}-${day}`;
   });
   const [paginatedTableRef, setPaginatedTableRef] = useState(null);
+  const [mostRecentInference, setMostRecentInference] = useState(null);
+  const [isLoadingRecentInference, setIsLoadingRecentInference] = useState(true);
 
-  useEffect(() => {
-    if (!isConfigLoading && user?.id) {
-      loadDashboardData();
-    }
-  }, [isConfigLoading, user]);
-
-  useEffect(() => {
-    let intervalId;
-    
-    const updateData = async () => {
-      try {
-        const recentResponse = await getAllInferenceHistory(1, 1);
-        if (recentResponse.items && recentResponse.items.length > 0) {
-          setInference(recentResponse.items[0]);
-        }
-        
-        if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
-          paginatedTableRef.refreshCurrentPage();
-        }
-      } catch (error) {
-        console.error('Erro ao atualizar dados automaticamente:', error);
-      }
-    };
-    
-    if (pollingEnabled && user?.id) {
-      updateData();
-      
-      intervalId = setInterval(updateData, 60000);
-      setPollingIntervalId(intervalId);
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-        setPollingIntervalId(null);
-      }
-    };
-  }, [pollingEnabled, user, paginatedTableRef]);
-
-  const loadStatsFromApi = async (startDate = statsStartDate, endDate = statsEndDate) => {
+  const loadStatsFromApi = useCallback(async (startDate = statsStartDate, endDate = statsEndDate) => {
     try {
+      setIsLoadingData(true);
+      setApiError(null);
+      
       const start = new Date(startDate);
       const end = new Date(endDate);
       const diffTime = Math.abs(end - start);
@@ -102,48 +66,58 @@ const Dashboard = () => {
       } else {
         toast.error('Erro ao carregar estatísticas');
       }
-    }
-  };
-
-  const loadDashboardData = async () => {
-    if (!user?.id) {
-      console.error('Usuário não possui ID válido');
-      setApiError('Erro: Dados do usuário incompletos');
-      setIsLoadingData(false);
-      return;
-    }
-
-    try {
-      setIsLoadingData(true);
-      setApiError(null);
-      
-      const recentResponse = await getAllInferenceHistory(1, 1);
-      const history = recentResponse.items || [];
-      
-      if (history && history.length > 0) {
-        setInference(history[0]);
-      } else {
-        setInference(null);
-      }
-
-      await loadStatsFromApi();
-    } catch (error) {
-      console.error('Error loading inference history:', error);
-      const errorMessage = error.response?.data?.detail || error.message || 'Erro desconhecido';
-      setApiError(`Erro ao carregar histórico: ${errorMessage}`);
-      
-      if (error.response?.status === 401) {
-        toast.error('Sessão expirada. Faça login novamente.');
-        setTimeout(() => logout(), 2000);
-      } else {
-        toast.error('Erro ao carregar histórico de análises');
-      }
-      
-      setInference(null);
     } finally {
       setIsLoadingData(false);
     }
-  };
+  }, [statsStartDate, statsEndDate, logout]);
+
+  const loadDashboardData = useCallback(async () => {
+    if (!user?.id) {
+      console.error('Usuário não possui ID válido');
+      setApiError('Erro: Dados do usuário incompletos');
+      return;
+    }
+
+    await loadStatsFromApi();
+    
+    if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
+      paginatedTableRef.refreshCurrentPage();
+    }
+  }, [user, loadStatsFromApi, paginatedTableRef]);
+
+  useEffect(() => {
+    if (!isConfigLoading && user?.id) {
+      loadStatsFromApi();
+    }
+  }, [isConfigLoading, user, loadStatsFromApi]);
+
+  useEffect(() => {
+    let intervalId;
+    
+    const updateData = async () => {
+      try {
+        if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
+          paginatedTableRef.refreshCurrentPage();
+        }
+        
+        await loadStatsFromApi();
+      } catch (error) {
+        console.error('Erro ao atualizar dados automaticamente:', error);
+      }
+    };
+    
+    if (pollingEnabled && user?.id) {
+      intervalId = setInterval(updateData, 60000);
+      setPollingIntervalId(intervalId);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+        setPollingIntervalId(null);
+      }
+    };
+  }, [pollingEnabled, user, paginatedTableRef, loadStatsFromApi]);
 
   const handleViewDetails = (inference) => {
     setSelectedInference(inference);
@@ -165,19 +139,6 @@ const Dashboard = () => {
       console.warn('Inferência inválida recebida:', newInference);
       return;
     }
-    
-    const formattedInference = {
-      ...newInference,
-      image_id: newInference.image_id || newInference.request_id,
-      processing_timestamp: newInference.processing_timestamp || new Date().toISOString(),
-      location: newInference.location || newInference.metadata?.location || 'Webcam',
-      status: newInference.status || 'completed',
-      results: newInference.results || [],
-      summary: newInference.summary || {},
-      metadata: newInference.metadata || {}
-    };
-    
-    setInference(formattedInference);
 
     if (paginatedTableRef && typeof paginatedTableRef.refreshCurrentPage === 'function') {
       paginatedTableRef.refreshCurrentPage();
@@ -360,8 +321,8 @@ const Dashboard = () => {
 
             <div className="mb-6">
               <RecentInference 
-                inference={inference} 
-                isLoading={isLoadingData} 
+                inference={mostRecentInference} 
+                isLoading={isLoadingRecentInference} 
                 onViewDetails={handleViewDetails} 
               />
             </div>
@@ -371,6 +332,8 @@ const Dashboard = () => {
                 userId={user.id}
                 onViewDetails={handleViewDetails}
                 onRefReady={setPaginatedTableRef}
+                onMostRecentChange={setMostRecentInference}
+                onLoadingChange={setIsLoadingRecentInference}
               />
             </div>
           </>

@@ -4,7 +4,7 @@ import usePaginatedInferences from '../../hooks/usePaginatedInferences';
 import { getInferenceDetails } from '../../api/inferenceApi';
 import Loader from '../common/Loader';
 
-const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) => {
+const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady, onMostRecentChange, onLoadingChange }) => {
   const ITEMS_PER_PAGE = 25;
 
   const {
@@ -16,6 +16,7 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) =
     hasMore,
     totalItems,
     filters,
+    mostRecentInference,
     goToPage,
     refreshCurrentPage,
     updateFilters,
@@ -28,6 +29,18 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) =
       onRefReady({ refreshCurrentPage });
     }
   }, [onRefReady, refreshCurrentPage]);
+  
+  useEffect(() => {
+    if (onMostRecentChange && typeof onMostRecentChange === 'function') {
+      onMostRecentChange(mostRecentInference);
+    }
+  }, [mostRecentInference, onMostRecentChange]);
+  
+  useEffect(() => {
+    if (onLoadingChange && typeof onLoadingChange === 'function' && currentPage === 1) {
+      onLoadingChange(isLoading);
+    }
+  }, [isLoading, onLoadingChange, currentPage]);
 
   const [sortField, setSortField] = useState('processing_timestamp');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -249,33 +262,21 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) =
   return (
     <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden">
       <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
-              Histórico de Análises
-            </h3>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-              {totalItems} inspeções encontradas
-              {hasActiveFilters() && (
-                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
-                  </svg>
-                  Filtros ativos
-                </span>
-              )}
-            </p>
-          </div>
-          <button
-            onClick={refreshCurrentPage}
-            disabled={isLoading}
-            className="px-3 py-2 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 flex items-center"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
-            </svg>
-            {isLoading ? 'Atualizando...' : 'Atualizar'}
-          </button>
+        <div className="mb-4">
+          <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-white">
+            Histórico de Análises
+          </h3>
+          <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
+            {totalItems} inspeções encontradas
+            {hasActiveFilters() && (
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+                </svg>
+                Filtros ativos
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -479,18 +480,18 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) =
                     onClick={() => handleSort('summary.average_maturation_score')}
                   >
                     <div className="flex items-center">
-                      Maturação Média
+                      Confiança média de maturação
                       {renderSortIndicator('summary.average_maturation_score')}
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => handleSort('summary.average_confidence')}
+                    onClick={() => handleSort('summary.average_detection_confidence')}
                   >
                     <div className="flex items-center">
-                      Confiança Média
-                      {renderSortIndicator('summary.average_confidence')}
+                      Confiança média de detecção
+                      {renderSortIndicator('summary.average_detection_confidence')}
                     </div>
                   </th>
                   <th
@@ -620,15 +621,15 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady }) =
                             <div
                               className="bg-blue-500 h-2 rounded-full"
                               style={{
-                                width: `${inference.summary?.average_confidence
-                                  ? (inference.summary.average_confidence * 100)
+                                width: `${inference.summary?.average_detection_confidence
+                                  ? (inference.summary.average_detection_confidence * 100)
                                   : 0}%`
                               }}
                             ></div>
                           </div>
                           <span className="text-xs font-medium">
-                            {inference.summary?.average_confidence
-                              ? `${(inference.summary.average_confidence * 100).toFixed(1)}%`
+                            {inference.summary?.average_detection_confidence
+                              ? `${(inference.summary.average_detection_confidence * 100).toFixed(1)}%`
                               : 'N/A'}
                           </span>
                         </div>

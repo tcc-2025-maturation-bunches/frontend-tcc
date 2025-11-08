@@ -153,18 +153,18 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
                     onClick={() => handleSort('summary.average_maturation_score')}
                   >
                     <div className="flex items-center">
-                      Maturação Média
+                      Confiança média de maturação
                       {renderSortIndicator('summary.average_maturation_score')}
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => handleSort('summary.average_confidence')}
+                    onClick={() => handleSort('summary.average_detection_confidence')}
                   >
                     <div className="flex items-center">
-                      Confiança Média
-                      {renderSortIndicator('summary.average_confidence')}
+                      Confiança média de detecção
+                      {renderSortIndicator('summary.average_detection_confidence')}
                     </div>
                   </th>
                   <th
@@ -257,7 +257,7 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
                             <div className="w-2 h-2 bg-green-500 rounded-full" title="Verdes"></div>
                             <div className="w-2 h-2 bg-lime-500 rounded-full" title="Quase Maduros"></div>
                             <div className="w-2 h-2 bg-yellow-500 rounded-full" title="Maduros"></div>
-                            <div className="w-2 h-2 bg-red-500 rounded-full" title="Muito Maduros ou Passados"></div>
+                            <div className="w-2 h-2 bg-red-500 rounded-full" title="Muito Maduros/Passados"></div>
                           </div>
                         </div>
                       </td>
@@ -286,15 +286,15 @@ const InferenceHistoryTable = ({ data, isLoading, onViewDetails }) => {
                             <div 
                               className="bg-blue-500 h-2 rounded-full" 
                               style={{ 
-                                width: `${inference.summary?.average_confidence 
-                                  ? (inference.summary.average_confidence * 100) 
+                                width: `${inference.summary?.average_detection_confidence 
+                                  ? (inference.summary.average_detection_confidence * 100) 
                                   : 0}%` 
                               }}
                             ></div>
                           </div>
                           <span className="text-xs font-medium">
-                            {inference.summary?.average_confidence
-                              ? `${(inference.summary.average_confidence * 100).toFixed(1)}%`
+                            {inference.summary?.average_detection_confidence
+                              ? `${(inference.summary.average_detection_confidence * 100).toFixed(1)}%`
                               : 'N/A'}
                           </span>
                         </div>

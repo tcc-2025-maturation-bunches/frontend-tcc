@@ -209,7 +209,7 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                       </dd>
                     </div>
                     <div className="flex justify-between items-center">
-                      <dt className="text-gray-500 dark:text-gray-400 font-medium">Maturação Média:</dt>
+                      <dt className="text-gray-500 dark:text-gray-400 font-medium">Confiança média de maturação:</dt>
                       <dd className="text-gray-900 dark:text-gray-200 font-semibold">
                         {formatMaturationScore(
                           inference.detection_result?.summary?.average_maturation_score || 
@@ -218,12 +218,12 @@ const RecentInference = ({ inference, isLoading, onViewDetails }) => {
                       </dd>
                     </div>
                     <div className="flex justify-between items-center">
-                      <dt className="text-gray-500 dark:text-gray-400 font-medium">Confiança Média:</dt>
+                      <dt className="text-gray-500 dark:text-gray-400 font-medium">Confiança média de detecção:</dt>
                       <dd className="text-gray-900 dark:text-gray-200 font-semibold">
                         {formatConfidence(
                           inference.detection_result?.results?.length > 0 
                             ? inference.detection_result.results.reduce((sum, r) => sum + parseFloat(r.confidence || 0), 0) / inference.detection_result.results.length
-                            : inference.summary?.average_confidence
+                            : inference.summary?.average_detection_confidence
                         )}
                       </dd>
                     </div>
