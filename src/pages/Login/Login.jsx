@@ -24,14 +24,9 @@ const Login = () => {
     setSuccess('');
 
     try {
-      console.log('Tentando fazer login...');
       const result = await login(username, password);
-      
-      console.log('Resultado do login:', result);
-      
       if (result.success) {
         setSuccess('Login realizado com sucesso! Carregando...');
-        console.log('Login bem-sucedido, aguardando redirecionamento...');
       } else {
         const errorMsg = result.error || 'Usuário ou senha inválidos';
         console.error('Erro no login:', errorMsg);

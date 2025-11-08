@@ -89,7 +89,19 @@ const Dashboard = () => {
     if (!isConfigLoading && user?.id) {
       loadStatsFromApi();
     }
-  }, [isConfigLoading, user, loadStatsFromApi]);
+  }, [isConfigLoading, user?.id, loadStatsFromApi]);
+
+  useEffect(() => {
+    if (paginatedTableRef && user?.id && !isConfigLoading) {
+      const timer = setTimeout(() => {
+        if (typeof paginatedTableRef.refreshCurrentPage === 'function') {
+          paginatedTableRef.refreshCurrentPage();
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [paginatedTableRef, user?.id, isConfigLoading]);
 
   useEffect(() => {
     let intervalId;
