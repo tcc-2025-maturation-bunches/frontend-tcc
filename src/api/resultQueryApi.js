@@ -38,7 +38,7 @@ const endpoints = {
   resultsByImage: '/results/image/',
   resultsByUser: '/results/user/',
   resultsByDevice: '/results/device/',
-  allResults: '/results/all',
+  allResults: '/results/all-cursor',
   resultsSummary: '/results/summary',
   userStats: '/results/stats/user/',
   inferenceStats: '/results/stats/inference',
@@ -75,7 +75,7 @@ export const getResultsByDeviceId = async (deviceId, limit = 20) => {
 
 export const getAllResults = async (params = {}) => {
   const {
-    page = 1,
+    cursor = null,
     pageSize = 20,
     statusFilter = null,
     userId = null,
@@ -85,9 +85,12 @@ export const getAllResults = async (params = {}) => {
   } = params;
 
   const queryParams = {
-    page,
     page_size: pageSize
   };
+
+  if (cursor) {
+    queryParams.cursor = cursor;
+  }
 
   if (statusFilter === 'error' || statusFilter === 'partial_error') {
     queryParams.exclude_errors = false;

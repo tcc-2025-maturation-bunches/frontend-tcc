@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import Pagination from '../common/Pagination';
+import CursorPagination from '../common/CursorPagination';
 import usePaginatedInferences from '../../hooks/usePaginatedInferences';
 import { getInferenceDetails } from '../../api/inferenceApi';
 import Loader from '../common/Loader';
@@ -10,14 +10,14 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady, onM
   const {
     data,
     currentPage,
-    totalPages,
+    hasPrevious,
+    hasNext,
     isLoading,
     error,
-    hasMore,
-    totalItems,
     filters,
     mostRecentInference,
-    goToPage,
+    goToNextPage,
+    goToPreviousPage,
     refreshCurrentPage,
     updateFilters,
     clearFilters,
@@ -267,7 +267,14 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady, onM
             Histórico de Análises
           </h3>
           <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-            {totalItems} inspeções encontradas
+            {data.length > 0 ? (
+              <>
+                Mostrando {data.length} {data.length === 1 ? 'inspeção' : 'inspeções'} na página {currentPage}
+                {hasNext && <span className="text-gray-400"> • Mais resultados disponíveis</span>}
+              </>
+            ) : (
+              'Nenhuma inspeção encontrada'
+            )}
             {hasActiveFilters() && (
               <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -651,14 +658,14 @@ const InferenceHistoryTablePaginated = ({ userId, onViewDetails, onRefReady, onM
             </table>
           </div>
 
-          <Pagination
+          <CursorPagination
             currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={goToPage}
+            hasPrevious={hasPrevious}
+            hasNext={hasNext}
+            onPreviousPage={goToPreviousPage}
+            onNextPage={goToNextPage}
             isLoading={isLoading}
-            hasMore={hasMore}
             itemsPerPage={itemsPerPage}
-            totalItems={totalItems}
           />
         </>
       )}
