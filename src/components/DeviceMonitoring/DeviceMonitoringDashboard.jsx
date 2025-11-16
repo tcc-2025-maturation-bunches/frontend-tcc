@@ -158,7 +158,7 @@ const DeviceMonitoringDashboard = () => {
       </div>
 
       {dashboardData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-5 gap-5">
           <StatusCard
             title="Total de Dispositivos"
             value={dashboardData.total_devices || 0}
@@ -176,6 +176,16 @@ const DeviceMonitoringDashboard = () => {
             icon={
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
+              </svg>
+            }
+          />
+          <StatusCard
+            title="Dispositivos em Manutenção/Erro"
+            value={(dashboardData.maintenance_devices || 0) + (dashboardData.error_devices || 0)}
+            color="text-yellow-600 dark:text-yellow-400"
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             }
           />
