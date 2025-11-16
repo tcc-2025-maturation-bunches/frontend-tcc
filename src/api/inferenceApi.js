@@ -154,10 +154,10 @@ export const getInferenceHistory = async (userId, limit = 100) => {
   }
 };
 
-export const getAllInferenceHistory = async (page = 1, pageSize = 25, filters = {}) => {
+export const getAllInferenceHistory = async (cursor = null, pageSize = 25, filters = {}) => {
   try {
     const response = await getAllResults({
-      page,
+      cursor,
       pageSize,
       statusFilter: filters.statusFilter,
       userId: filters.userId,
@@ -170,11 +170,9 @@ export const getAllInferenceHistory = async (page = 1, pageSize = 25, filters = 
 
     return {
       items: transformedData,
-      current_page: response.current_page || page,
-      total_pages: response.total_pages || 1,
-      total_count: response.total_count || 0,
-      has_previous: response.has_previous || false,
-      has_next: response.has_next || false,
+      next_cursor: response.next_cursor || null,
+      has_more: response.has_more || false,
+      count: response.count || 0,
     };
   } catch (error) {
     console.error('Erro ao buscar histórico geral:', error);
@@ -292,7 +290,7 @@ export const startHistoryPolling = (userId, callback, intervalSeconds = 60) => {
   const pollHistory = async () => {
     if (!isPolling) return;
     try {
-      const data = await getAllInferenceHistory(1, 1);
+      const data = await getAllInferenceHistory(null, 1);
       if (isPolling) {
         callback(null, data.items);
       }

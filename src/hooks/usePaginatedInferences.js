@@ -1,31 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getAllInferenceHistory } from '../api/inferenceApi';
 
 const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) => {
   const [data, setData] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [cursors, setCursors] = useState([null]);
+  const [currentCursorIndex, setCurrentCursorIndex] = useState(0);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
   const [filters, setFilters] = useState(initialFilters);
   const [mostRecentInference, setMostRecentInference] = useState(null);
+  
+  const isInitializedRef = useRef(false);
 
-  const loadPage = useCallback(async (page, currentFilters = filters, forceRefresh = false) => {
+  const loadPage = useCallback(async (cursor, currentFilters) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      const response = await getAllInferenceHistory(page, itemsPerPage, currentFilters);
+      const response = await getAllInferenceHistory(cursor, itemsPerPage, currentFilters);
 
       setData(response.items || []);
-      setCurrentPage(response.current_page || page);
-      setTotalPages(response.total_pages || 1);
-      setTotalItems(response.total_count || 0);
-      setHasMore(response.has_next || false);
+      setNextCursor(response.next_cursor || null);
+      setHasMore(response.has_more || false);
       
-      if (page === 1 && Object.keys(currentFilters).every(key => !currentFilters[key])) {
+      if (cursor === null && Object.keys(currentFilters).every(key => !currentFilters[key])) {
         if (response.items && response.items.length > 0) {
           setMostRecentInference(response.items[0]);
         } else {
@@ -37,68 +37,85 @@ const usePaginatedInferences = (userId, itemsPerPage = 50, initialFilters = {}) 
       console.error('Error loading page:', err);
       setError(err.message || 'Erro ao carregar dados');
       setData([]);
-      setTotalPages(1);
-      setTotalItems(0);
+      setNextCursor(null);
+      setHasMore(false);
       setMostRecentInference(null);
     } finally {
       setIsLoading(false);
     }
-  }, [itemsPerPage]);
+  }, [itemsPerPage, filters]);
 
-  const goToPage = useCallback((page) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
-    loadPage(page, filters);
-  }, [loadPage, totalPages, filters]);
+  const goToNextPage = useCallback(() => {
+    if (!hasMore || !nextCursor) return;
+    
+    const newCursors = [...cursors, nextCursor];
+    setCursors(newCursors);
+    setCurrentCursorIndex(newCursors.length - 1);
+    loadPage(nextCursor, filters);
+  }, [hasMore, nextCursor, cursors, loadPage, filters]);
+
+  const goToPreviousPage = useCallback(() => {
+    if (currentCursorIndex <= 0) return;
+    
+    const previousCursorIndex = currentCursorIndex - 1;
+    const previousCursor = cursors[previousCursorIndex];
+    setCurrentCursorIndex(previousCursorIndex);
+    loadPage(previousCursor, filters);
+  }, [currentCursorIndex, cursors, loadPage, filters]);
 
   const refreshCurrentPage = useCallback(() => {
-    loadPage(currentPage, filters, true);
-  }, [currentPage, filters, loadPage]);
+    const currentCursor = cursors[currentCursorIndex];
+    loadPage(currentCursor, filters);
+  }, [cursors, currentCursorIndex, filters, loadPage]);
 
   const resetPagination = useCallback(() => {
-    setCurrentPage(1);
+    setCursors([null]);
+    setCurrentCursorIndex(0);
+    setNextCursor(null);
     setData([]);
-    setTotalItems(0);
-    setTotalPages(1);
     setHasMore(false);
-    loadPage(1, filters);
+    loadPage(null, filters);
   }, [loadPage, filters]);
 
   const updateFilters = useCallback((newFilters) => {
     setFilters(newFilters);
-    setCurrentPage(1);
-    loadPage(1, newFilters);
+    setCursors([null]);
+    setCurrentCursorIndex(0);
+    loadPage(null, newFilters);
   }, [loadPage]);
 
   const clearFilters = useCallback(() => {
     setFilters({});
-    setCurrentPage(1);
-    loadPage(1, {});
+    setCursors([null]);
+    setCurrentCursorIndex(0);
+    loadPage(null, {});
   }, [loadPage]);
 
   useEffect(() => {
     if (userId) {
-      loadPage(1, filters);
+      if (!isInitializedRef.current) {
+        isInitializedRef.current = true;
+      }
+      loadPage(null, filters);
     } else {
       setData([]);
-      setTotalItems(0);
-      setTotalPages(1);
-      setCurrentPage(1);
+      setCursors([null]);
+      setCurrentCursorIndex(0);
       setIsLoading(false);
     }
   }, [userId, itemsPerPage]);
 
   return {
     data,
-    currentPage,
-    totalPages,
+    currentPage: currentCursorIndex + 1,
+    hasPrevious: currentCursorIndex > 0,
+    hasNext: hasMore,
     isLoading,
     error,
-    hasMore,
-    totalItems,
     filters,
     mostRecentInference,
-    goToPage,
+    goToNextPage,
+    goToPreviousPage,
     refreshCurrentPage,
     resetPagination,
     updateFilters,
