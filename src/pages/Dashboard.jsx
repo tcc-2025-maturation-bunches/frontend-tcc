@@ -4,6 +4,7 @@ import ThemeToggle from '../components/common/ThemeToggle';
 import RecentInference from '../components/Dashboard/RecentInference';
 import InferenceStats from '../components/Dashboard/InferenceStats';
 import DeviceMonitoringDashboard from '../components/DeviceMonitoring/DeviceMonitoringDashboard';
+import UserManagementDashboard from '../components/Admin/UserManagementDashboard';
 import Loader from '../components/common/Loader';
 import WebcamCaptureModal from '../components/Dashboard/WebcamCaptureModal';
 import InferenceDetailsModal from '../components/Dashboard/InferenceDetailsModal';
@@ -291,6 +292,24 @@ const Dashboard = () => {
                 Monitoramento de Dispositivos
               </div>
             </button>
+
+            {user.user_type === 'admin' && (
+              <button
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'admin'
+                    ? 'border-green-500 text-green-600 dark:text-green-400'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                }`}
+                onClick={() => setActiveTab('admin')}
+              >
+                <div className="flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                  </svg>
+                  Gerenciar Usuários
+                </div>
+              </button>
+            )}
           </nav>
         </div>
 
@@ -463,9 +482,11 @@ const Dashboard = () => {
               isLoading={isLoadingData} 
             />
           </>
-        ) : (
+        ) : activeTab === 'devices' ? (
           <DeviceMonitoringDashboard />
-        )}
+        ) : activeTab === 'admin' && user.user_type === 'admin' ? (
+          <UserManagementDashboard currentUser={user} />
+        ) : null}
       </main>
 
       {isDetailModalOpen && selectedInference && (

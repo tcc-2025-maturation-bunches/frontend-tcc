@@ -75,4 +75,9 @@ export const deleteUser = async (userId) => {
   await authClient.delete(`/users/${userId}`);
 };
 
+export const listUsers = async () => {
+  const response = await authClient.get('/users/');
+  return response.data;
+};
+
 export default authClient;
